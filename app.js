@@ -155,6 +155,38 @@ function examById(id){
   return EXAMS_DB.find(e => e.id === id);
 }
 
+// ---------- Remote data (server-only — jamais expédiées en un seul fichier) ----------
+// EXAMS_DB ne contient que les métadonnées (pas les questions ni les corrections).
+// Les questions et corrections sont chargées à la demande via /api, examen par examen,
+// pour qu'il soit impossible de récupérer toute la banque de QCM en un seul téléchargement.
+let EXAMS_DB = [];
+const examQuestionsCache = new Map();
+const examCorrectionsCache = new Map();
+
+async function loadExamsMeta(){
+  const res = await fetch("/api/exams");
+  if (!res.ok) throw new Error("exams meta fetch failed");
+  EXAMS_DB = await res.json();
+}
+
+async function loadExamQuestions(id){
+  if (examQuestionsCache.has(id)) return examQuestionsCache.get(id);
+  const res = await fetch("/api/exam?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("exam fetch failed");
+  const data = await res.json();
+  examQuestionsCache.set(id, data.questions);
+  return data.questions;
+}
+
+async function loadCorrections(id){
+  if (examCorrectionsCache.has(id)) return examCorrectionsCache.get(id);
+  const res = await fetch("/api/correction?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("correction fetch failed");
+  const data = await res.json();
+  examCorrectionsCache.set(id, data.corrections);
+  return data.corrections;
+}
+
 // ---------- Progress storage ----------
 function loadProgress(examId){
   try{ return JSON.parse(localStorage.getItem("prepari:progress:"+examId)) || {}; }
@@ -193,7 +225,17 @@ window.addEventListener("hashchange", () => {
     window.scrollTo(0, 0);
   }
 });
-window.addEventListener("DOMContentLoaded", route);
+
+let bootStarted = false;
+function boot(){
+  if (bootStarted) return;
+  bootStarted = true;
+  app.innerHTML = `<div class="empty">Chargement…</div>`;
+  loadExamsMeta().then(route).catch(() => {
+    app.innerHTML = `<div class="empty">Impossible de charger les données de Suprepa. Vérifie ta connexion et recharge la page.</div>`;
+  });
+}
+window.addEventListener("DOMContentLoaded", boot);
 
 let examTimerHandle = null;
 let sessionKeyHandler = null;
@@ -366,46 +408,51 @@ function renderProgression(){
     return;
   }
 
-  let totalFinished = 0;
-  const rows = items.map(({exam, data}) => {
-    const answered = Object.keys(data.answers||{}).length;
-    let nCorrect = 0, nCorrectable = 0;
-    exam.questions.forEach((q,i) => {
-      if (!q.correct) return;
-      nCorrectable++;
-      if (data.answers && data.answers[i] === q.correct) nCorrect++;
-    });
-    if (data.finishedAt) totalFinished++;
-    return {exam, data, answered, nCorrect, nCorrectable};
-  }).sort((a,b) => (b.data.updatedAt||0) - (a.data.updatedAt||0));
+  app.innerHTML = `<div class="empty">Chargement de ta progression…</div>`;
 
-  const totalCorrect = rows.reduce((s,r)=>s+r.nCorrect,0);
-  const totalCorrectable = rows.reduce((s,r)=>s+r.nCorrectable,0);
+  Promise.all(items.map(({exam}) => loadCorrections(exam.id).catch(() => []))).then(correctionsList => {
+    let totalFinished = 0;
+    const rows = items.map(({exam, data}, i) => {
+      const answered = Object.keys(data.answers||{}).length;
+      const corrections = correctionsList[i] || [];
+      let nCorrect = 0, nCorrectable = 0;
+      corrections.forEach((c, qi) => {
+        if (!c || !c.correct) return;
+        nCorrectable++;
+        if (data.answers && data.answers[qi] === c.correct) nCorrect++;
+      });
+      if (data.finishedAt) totalFinished++;
+      return {exam, data, answered, nCorrect, nCorrectable};
+    }).sort((a,b) => (b.data.updatedAt||0) - (a.data.updatedAt||0));
 
-  const rowsHtml = rows.map(({exam, data, answered, nCorrect, nCorrectable}) => `
-    <div class="exam-row">
-      <div class="left">
-        <span class="year">${exam.annee}</span>
-        <div>
-          <div style="font-weight:600;">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)}</div>
-          <div class="n">${answered} / ${exam.n} répondues${data.finishedAt ? " · terminé" : " · en cours"}${nCorrectable ? ` · score ${nCorrect}/${nCorrectable}` : ""}</div>
+    const totalCorrect = rows.reduce((s,r)=>s+r.nCorrect,0);
+    const totalCorrectable = rows.reduce((s,r)=>s+r.nCorrectable,0);
+
+    const rowsHtml = rows.map(({exam, data, answered, nCorrect, nCorrectable}) => `
+      <div class="exam-row">
+        <div class="left">
+          <span class="year">${exam.annee}</span>
+          <div>
+            <div style="font-weight:600;">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)}</div>
+            <div class="n">${answered} / ${exam.n} répondues${data.finishedAt ? " · terminé" : " · en cours"}${nCorrectable ? ` · score ${nCorrect}/${nCorrectable}` : ""}</div>
+          </div>
         </div>
-      </div>
-      <div class="actions">
-        <a class="btn" href="#/exam/${exam.id}/${data.mode||'cours'}">${data.finishedAt ? "Revoir" : "Continuer"}</a>
-      </div>
-    </div>`).join("");
+        <div class="actions">
+          <a class="btn" href="#/exam/${exam.id}/${data.mode||'cours'}">${data.finishedAt ? "Revoir" : "Continuer"}</a>
+        </div>
+      </div>`).join("");
 
-  app.innerHTML = `
-    <div class="section-head"><h2>Ma progression</h2><span class="hint">${items.length} examen${items.length>1?"s":""} entamé${items.length>1?"s":""}</span></div>
-    <div class="summary-grid" style="margin-bottom:32px;">
-      <div class="summary-stat"><b>${items.length}</b><span>Examens entamés</span></div>
-      <div class="summary-stat"><b>${totalFinished}</b><span>Terminés</span></div>
-      <div class="summary-stat"><b>${totalCorrectable ? Math.round(100*totalCorrect/totalCorrectable)+"%" : "—"}</b><span>Taux de réussite (corrigées)</span></div>
-    </div>
-    ${rowsHtml}
-  `;
-  animateCounters();
+    app.innerHTML = `
+      <div class="section-head"><h2>Ma progression</h2><span class="hint">${items.length} examen${items.length>1?"s":""} entamé${items.length>1?"s":""}</span></div>
+      <div class="summary-grid" style="margin-bottom:32px;">
+        <div class="summary-stat"><b>${items.length}</b><span>Examens entamés</span></div>
+        <div class="summary-stat"><b>${totalFinished}</b><span>Terminés</span></div>
+        <div class="summary-stat"><b>${totalCorrectable ? Math.round(100*totalCorrect/totalCorrectable)+"%" : "—"}</b><span>Taux de réussite (corrigées)</span></div>
+      </div>
+      ${rowsHtml}
+    `;
+    animateCounters();
+  });
 }
 
 function renderConcours(concours){
@@ -496,10 +543,19 @@ function renderModePicker(examId){
   `;
 }
 
-function renderSession(examId, mode){
+async function renderSession(examId, mode){
   const exam = examById(examId);
   if (!exam) return renderHome();
   setCrumbs(`<a href="#/">Accueil</a> / <a href="#/exam/${exam.id}">${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${exam.annee}</a> / ${mode === "examen" ? "Examen" : "Cours"}`);
+
+  app.innerHTML = `<div class="empty">Chargement de l'examen…</div>`;
+  let questions;
+  try{
+    questions = await loadExamQuestions(examId);
+  }catch(e){
+    app.innerHTML = `<div class="empty">Impossible de charger cet examen. Vérifie ta connexion et réessaie.</div>`;
+    return;
+  }
 
   const progress = loadProgress(examId);
   const state = {
@@ -509,7 +565,8 @@ function renderSession(examId, mode){
     mode,
     secondsLeft: mode === "examen" ? Math.round(exam.n * 90) : null,
     finished: false,
-    reviewMode: !!progress.finishedAt
+    reviewMode: !!progress.finishedAt,
+    corrections: null
   };
 
   function persist(finishedNow){
@@ -522,20 +579,35 @@ function renderSession(examId, mode){
     });
   }
 
-  function renderQuestion(){
+  // Les corrections (bonne réponse + explication) ne sont récupérées qu'au moment
+  // où elles doivent réellement être révélées, jamais chargées d'avance en bloc.
+  async function ensureCorrections(){
+    if (!state.corrections){
+      try{ state.corrections = await loadCorrections(examId); }
+      catch(e){ state.corrections = questions.map(() => ({correct:null, explanation:null})); }
+    }
+    return state.corrections;
+  }
+
+  async function renderQuestion(){
     if (state.finished) return renderSummary();
-    const q = exam.questions[state.idx];
+    const q = questions[state.idx];
     const selected = state.answers[state.idx];
-    const total = exam.questions.length;
+    const total = questions.length;
 
     // Reveal correction: always in review mode, or immediately in cours mode once answered.
     const reveal = !!(state.reviewMode || (mode === "cours" && selected));
-    const hasCorrection = !!q.correct;
+    const hasCorrection = !!q.hasCorrection;
+    let correctInfo = null;
+    if (reveal){
+      const corrections = await ensureCorrections();
+      correctInfo = corrections[state.idx] || null;
+    }
 
     const optionsHtml = q.options.map(o => {
       let cls = selected === o.letter ? "selected" : "";
-      if (reveal && hasCorrection){
-        if (o.letter === q.correct) cls += " correct";
+      if (reveal && hasCorrection && correctInfo && correctInfo.correct){
+        if (o.letter === correctInfo.correct) cls += " correct";
         else if (o.letter === selected) cls += " incorrect";
       }
       return `
@@ -547,12 +619,12 @@ function renderSession(examId, mode){
 
     let correctionHtml = "";
     if (reveal){
-      if (hasCorrection){
-        const isRight = selected === q.correct;
+      if (hasCorrection && correctInfo && correctInfo.correct){
+        const isRight = selected === correctInfo.correct;
         correctionHtml = `
           <div class="notice" style="border-color:${isRight? 'var(--green)':'var(--red)'};">
-            <b style="color:${isRight? 'var(--green)':'var(--red)'};">${selected ? (isRight ? "Bonne réponse !" : "Ce n'est pas la bonne réponse.") : "Correction"} — réponse correcte : ${q.correct}</b>
-            ${q.explanation ? `<div style="margin-top:8px;">${q.explanation}</div>` : ""}
+            <b style="color:${isRight? 'var(--green)':'var(--red)'};">${selected ? (isRight ? "Bonne réponse !" : "Ce n'est pas la bonne réponse.") : "Correction"} — réponse correcte : ${correctInfo.correct}</b>
+            ${correctInfo.explanation ? `<div style="margin-top:8px;">${correctInfo.explanation}</div>` : ""}
           </div>`;
       } else {
         correctionHtml = `<div class="notice">Correction non disponible pour cette question.</div>`;
@@ -589,59 +661,62 @@ function renderSession(examId, mode){
     `;
     renderMath();
 
-    function selectOption(letter){
+    async function selectOption(letter){
       if (state.reviewMode && mode === "examen") return; // read-only review of a timed exam
       state.answers[state.idx] = letter;
       persist();
-      renderQuestion();
+      await renderQuestion();
     }
 
     app.querySelectorAll(".option").forEach(btn => {
       btn.addEventListener("click", () => selectOption(btn.dataset.letter));
     });
-    $("#flagBtn").addEventListener("click", () => {
+    $("#flagBtn").addEventListener("click", async () => {
       if (state.flagged[state.idx]) delete state.flagged[state.idx];
       else state.flagged[state.idx] = true;
       persist();
-      renderQuestion();
+      await renderQuestion();
     });
-    $("#prevBtn").addEventListener("click", () => { if(state.idx>0){ state.idx--; renderQuestion(); }});
-    $("#nextBtn").addEventListener("click", () => {
-      if (state.idx < total-1){ state.idx++; renderQuestion(); }
-      else { state.finished = true; state.reviewMode = true; persist(true); renderQuestion(); }
+    $("#prevBtn").addEventListener("click", async () => { if(state.idx>0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }});
+    $("#nextBtn").addEventListener("click", async () => {
+      if (state.idx < total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }
+      else { state.finished = true; state.reviewMode = true; persist(true); await renderQuestion(); window.scrollTo(0,0); }
     });
 
     // Swipe gauche/droite pour naviguer entre les questions (mobile)
     enableSwipeNav($(".question-card"), {
-      onNext: () => { if (state.idx < total-1){ state.idx++; renderQuestion(); } },
-      onPrev: () => { if (state.idx > 0){ state.idx--; renderQuestion(); } }
+      onNext: async () => { if (state.idx < total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); } },
+      onPrev: async () => { if (state.idx > 0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); } }
     });
   }
 
-  function renderSummary(){
+  async function renderSummary(){
     if (examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; }
-    const total = exam.questions.length;
+    const total = questions.length;
     const answered = Object.keys(state.answers).length;
     const skipped = total - answered;
+    const corrections = await ensureCorrections();
 
-    const correctable = exam.questions.filter(q => q.correct);
+    const correctableIdx = [];
     let nCorrect = 0, nWrong = 0;
-    exam.questions.forEach((q, i) => {
-      if (!q.correct) return;
+    questions.forEach((q, i) => {
+      const c = corrections[i];
+      if (!c || !c.correct) return;
+      correctableIdx.push(i);
       const given = state.answers[i];
-      if (given && given === q.correct) nCorrect++;
+      if (given && given === c.correct) nCorrect++;
       else if (given) nWrong++;
     });
 
-    const scoreBlock = correctable.length
-      ? `<div class="summary-stat"><b>${nCorrect} / ${correctable.length}</b><span>Score (corrigées)</span></div>`
+    const scoreBlock = correctableIdx.length
+      ? `<div class="summary-stat"><b>${nCorrect} / ${correctableIdx.length}</b><span>Score (corrigées)</span></div>`
       : `<div class="summary-stat"><b>—</b><span>Aucune correction dispo</span></div>`;
 
     const flaggedIdx = Object.keys(state.flagged || {}).map(Number).sort((a,b)=>a-b);
     const flaggedHtml = flaggedIdx.length ? `
       <div class="section-head" style="margin-top:32px;"><h2 style="font-size:18px;">Questions marquées</h2><span class="hint">${flaggedIdx.length}</span></div>
       <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(90px,1fr));">
-        ${flaggedIdx.map(i => `<a class="btn ghost" style="text-align:center;" href="#/exam/${exam.id}/${mode}" data-goto="${i}">${exam.questions[i].num}</a>`).join("")}
+        ${flaggedIdx.map(i => `<a class="btn ghost" style="text-align:center;" href="#/exam/${exam.id}/${mode}" data-goto="${i}">${questions[i].num}</a>`).join("")}
       </div>` : "";
 
     app.innerHTML = `
@@ -656,7 +731,7 @@ function renderSession(examId, mode){
         <div class="summary-stat"><b>${answered}</b><span>Répondues</span></div>
         ${scoreBlock}
       </div>
-      <div class="notice">${correctable.length ? `${correctable.length} question${correctable.length>1?"s":""} sur ${total} avaient une correction disponible.` : "Aucune question de cet examen n'est corrigée pour le moment."} Revois tes réponses en détail ci-dessous.</div>
+      <div class="notice">${correctableIdx.length ? `${correctableIdx.length} question${correctableIdx.length>1?"s":""} sur ${total} avaient une correction disponible.` : "Aucune question de cet examen n'est corrigée pour le moment."} Revois tes réponses en détail ci-dessous.</div>
       ${flaggedHtml}
       <div class="session-nav" style="margin-top:24px;">
         <a class="btn" href="#/exam/${exam.id}/${mode}">&larr; Revoir les réponses</a>
@@ -680,34 +755,35 @@ function renderSession(examId, mode){
         state.reviewMode = true;
         persist(true);
         renderSummary();
+        window.scrollTo(0,0);
       }
     }, 1000);
   }
 
-  sessionKeyHandler = (e) => {
+  sessionKeyHandler = async (e) => {
     if (state.finished) return;
-    const total = exam.questions.length;
+    const total = questions.length;
     const tag = (document.activeElement && document.activeElement.tagName) || "";
     if (tag === "INPUT" || tag === "TEXTAREA") return;
     const letter = {a:"A",b:"B",c:"C",d:"D","1":"A","2":"B","3":"C","4":"D"}[e.key.toLowerCase()];
     if (letter){
-      const q = exam.questions[state.idx];
+      const q = questions[state.idx];
       if (q.options.some(o => o.letter === letter)){
         if (!(state.reviewMode && mode === "examen")){
           state.answers[state.idx] = letter;
           persist();
-          renderQuestion();
+          await renderQuestion();
         }
       }
     } else if (e.key === "ArrowRight"){
-      if (state.idx < total-1){ state.idx++; renderQuestion(); }
+      if (state.idx < total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }
     } else if (e.key === "ArrowLeft"){
-      if (state.idx > 0){ state.idx--; renderQuestion(); }
+      if (state.idx > 0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }
     } else if (e.key.toLowerCase() === "f"){
       if (state.flagged[state.idx]) delete state.flagged[state.idx];
       else state.flagged[state.idx] = true;
       persist();
-      renderQuestion();
+      await renderQuestion();
     }
   };
   document.addEventListener("keydown", sessionKeyHandler);
@@ -715,7 +791,7 @@ function renderSession(examId, mode){
   renderQuestion();
 }
 
-route();
+boot();
 
 // ---------- Global search ----------
 (function initSearch(){
