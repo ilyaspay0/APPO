@@ -1,0 +1,766 @@
+// ---------- Helpers ----------
+const $ = (sel, el=document) => el.querySelector(sel);
+const app = $("#app");
+const crumbsEl = $("#crumbs");
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+const prefersReducedMotion = () =>
+  window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ---------- Theme toggle (dark/light) ----------
+(function initTheme(){
+  const KEY = "suprepa-theme";
+  const root = document.documentElement;
+  const btn = document.getElementById("themeToggle");
+
+  function paintButton(theme){
+    if (!btn) return;
+    btn.textContent = theme === "dark" ? "☀" : "🌙";
+    btn.setAttribute("aria-label", theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre");
+  }
+  paintButton(root.getAttribute("data-theme") || "light");
+
+  if (btn){
+    btn.addEventListener("click", () => {
+      const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try{ localStorage.setItem(KEY, next); }catch(e){}
+      paintButton(next);
+    });
+  }
+})();
+
+// Animate a single counter element (its <b> tag) from 0 to its target value.
+function animateCounterEl(el){
+  const raw = el.textContent.trim();
+  const m = raw.match(/^([\d][\d,]*)/);
+  if (!m) return; // no leading number (e.g. "—") — leave as-is
+  const hasComma = m[1].includes(",");
+  const target = parseInt(m[1].replace(/,/g, ""), 10);
+  if (!isFinite(target)) return;
+  const suffix = raw.slice(m[1].length);
+  const dur = 550;
+  const start = performance.now();
+  function tick(now){
+    const p = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    const val = Math.round(target * eased);
+    el.textContent = (hasComma ? val.toLocaleString("fr-FR") : val) + suffix;
+    if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = raw;
+  }
+  requestAnimationFrame(tick);
+}
+
+// Animate number counters (stat-cell / summary-stat) from 0 to their target value, immediately.
+function animateCounters(root = app){
+  if (prefersReducedMotion()) return;
+  root.querySelectorAll(".stat-cell b, .summary-stat b").forEach(animateCounterEl);
+}
+
+// Reveal home-page sections (and count their stats up) as the user scrolls them into view.
+function initScrollReveal(root = app){
+  const targets = root.querySelectorAll(
+    ".home-page .stat-strip .stat-cell, .home-page .grid > *, .home-page .features-grid > *, " +
+    ".home-page .steps-row > *, .home-page .faq-list > *"
+  );
+  if (!targets.length) return;
+
+  const reveal = (el) => {
+    el.classList.add("is-visible");
+    const counter = el.matches(".stat-cell") ? el.querySelector("b") : null;
+    if (counter && !prefersReducedMotion()) animateCounterEl(counter);
+  };
+
+  if (prefersReducedMotion() || !("IntersectionObserver" in window)){
+    targets.forEach(reveal);
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting){
+        reveal(entry.target);
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold:0.15, rootMargin:"0px 0px -40px 0px" });
+  targets.forEach(el => io.observe(el));
+}
+
+// Enable left/right swipe to navigate between questions on touch devices.
+function enableSwipeNav(el, { onNext, onPrev }){
+  let sx = 0, sy = 0, tracking = false;
+  el.addEventListener("touchstart", e => {
+    const t = e.changedTouches[0];
+    sx = t.clientX; sy = t.clientY; tracking = true;
+  }, { passive:true });
+  el.addEventListener("touchend", e => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5){
+      if (dx < 0) onNext(); else onPrev();
+    }
+  }, { passive:true });
+}
+
+function renderMath(){
+  if (window.renderMathInElement){
+    renderMathInElement(app, {
+      delimiters: [
+        {left:"$$", right:"$$", display:true},
+        {left:"$", right:"$", display:false}
+      ],
+      throwOnError:false
+    });
+  } else {
+    // KaTeX not yet loaded (defer script) — retry shortly
+    setTimeout(renderMath, 150);
+  }
+}
+
+function fmtTime(sec){
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec/60), s = sec%60;
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+// ---------- Data indexing ----------
+const CONCOURS_ORDER = ["Médecine","ENSA","ENSAM","ENCG","ISPITS"];
+const CONCOURS_DESC = {
+  "Médecine":"FMPM, FMPR, FMPF, FMPC — Biologie, Chimie, Physique, Mathématiques",
+  "ENSA":"Écoles Nationales des Sciences Appliquées — Mathématiques, Physique, Chimie",
+  "ENSAM":"Écoles Nationales Sup. d'Arts et Métiers — Mathématiques, Physique",
+  "ENCG":"Concours TAFEM — Culture générale, Linguistique, Résolution de problèmes",
+  "ISPITS":"Instituts Sup. des Professions Infirmières — Biologie, Chimie, Physique"
+};
+
+function byConcours(concours){
+  return EXAMS_DB.filter(e => e.concours === concours);
+}
+function byMatiere(concours, matiere){
+  return EXAMS_DB.filter(e => e.concours === concours && e.matiere === matiere);
+}
+function matieresOf(concours){
+  const set = [...new Set(byConcours(concours).map(e => e.matiere))];
+  return set.sort();
+}
+function examById(id){
+  return EXAMS_DB.find(e => e.id === id);
+}
+
+// ---------- Progress storage ----------
+function loadProgress(examId){
+  try{ return JSON.parse(localStorage.getItem("prepari:progress:"+examId)) || {}; }
+  catch(e){ return {}; }
+}
+function saveProgress(examId, data){
+  try{ localStorage.setItem("prepari:progress:"+examId, JSON.stringify(data)); }catch(e){}
+}
+function allProgress(){
+  const out = [];
+  try{
+    for (let i=0; i<localStorage.length; i++){
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith("prepari:progress:")) continue;
+      const examId = key.slice("prepari:progress:".length);
+      const exam = examById(examId);
+      if (!exam) continue;
+      let data;
+      try{ data = JSON.parse(localStorage.getItem(key)); }catch(e){ continue; }
+      out.push({exam, data});
+    }
+  }catch(e){}
+  return out;
+}
+
+// ---------- Router ----------
+function parseHash(){
+  const h = location.hash.replace(/^#\/?/, "");
+  return h.split("/").filter(Boolean).map(decodeURIComponent);
+}
+
+window.addEventListener("hashchange", () => {
+  route();
+  // Only force scroll-to-top for real app routes (#/...), not in-page anchors like #faq or #concours-grid
+  if (location.hash.startsWith("#/") || location.hash === ""){
+    window.scrollTo(0, 0);
+  }
+});
+window.addEventListener("DOMContentLoaded", route);
+
+let examTimerHandle = null;
+let sessionKeyHandler = null;
+
+function route(){
+  if (examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; }
+  if (sessionKeyHandler){ document.removeEventListener("keydown", sessionKeyHandler); sessionKeyHandler = null; }
+  const parts = parseHash();
+  if (parts.length === 0) return renderHome();
+  if (parts[0] === "progression") return renderProgression();
+  if (parts[0] === "concours" && parts.length === 2) return renderConcours(parts[1]);
+  if (parts[0] === "concours" && parts.length === 3) return renderMatiere(parts[1], parts[2]);
+  if (parts[0] === "exam" && parts.length === 2) return renderModePicker(parts[1]);
+  if (parts[0] === "exam" && parts.length === 3) return renderSession(parts[1], parts[2]);
+  return renderHome();
+}
+
+function setCrumbs(html){ crumbsEl.innerHTML = html; }
+
+// ---------- Views ----------
+function renderHome(){
+  setCrumbs("");
+  const totalQ = EXAMS_DB.reduce((s,e)=>s+e.n,0);
+  const totalExams = EXAMS_DB.length;
+  const totalCorrected = EXAMS_DB.reduce((s,e)=>s+(e.nCorrected||0),0);
+
+  const cards = CONCOURS_ORDER.filter(c => byConcours(c).length).map(c => {
+    const exams = byConcours(c);
+    const q = exams.reduce((s,e)=>s+e.n,0);
+    return `
+      <a class="card concours-card" href="#/concours/${encodeURIComponent(c)}">
+        <span class="eyebrow">${matieresOf(c).length} matière${matieresOf(c).length>1?"s":""}</span>
+        <h3>${c}</h3>
+        <div class="meta">${CONCOURS_DESC[c]||""}</div>
+        <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
+      </a>`;
+  }).join("");
+
+  const resume = allProgress()
+    .filter(p => !p.data.finishedAt)
+    .sort((a,b) => (b.data.updatedAt||0) - (a.data.updatedAt||0))
+    .slice(0,3);
+  const resumeHtml = resume.length ? `
+    <div class="section-head"><h2>Reprendre mes révisions</h2><a class="hint" href="#/progression">Voir tout</a></div>
+    <div class="grid">
+      ${resume.map(({exam, data}) => {
+        const answered = Object.keys(data.answers||{}).length;
+        return `
+        <a class="card" href="#/exam/${exam.id}/${data.mode||'cours'}">
+          <span class="eyebrow">${escapeHtml(exam.concours)} · ${exam.annee}</span>
+          <h3>${escapeHtml(exam.matiere)}</h3>
+          <div class="meta">${answered} / ${exam.n} questions traitées</div>
+        </a>`;
+      }).join("")}
+    </div>` : "";
+
+  const nConcours = CONCOURS_ORDER.filter(c=>byConcours(c).length).length;
+
+  const featuresHtml = `
+    <div class="section-head"><h2>Pourquoi Suprepa ?</h2></div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="fnum">01</span>
+        <h3>100% gratuit</h3>
+        <p>Toute la banque de QCM est accessible librement, sans compte obligatoire et sans frais cachés.</p>
+      </div>
+      <div class="feature-card">
+        <span class="fnum">02</span>
+        <h3>Corrections détaillées</h3>
+        <p>Chaque question corrigée est accompagnée d'une explication claire : la bonne réponse, et pourquoi les autres sont fausses.</p>
+      </div>
+      <div class="feature-card">
+        <span class="fnum">03</span>
+        <h3>Deux modes d'entraînement</h3>
+        <p>Mode cours pour apprendre à ton rythme, mode examen chronométré pour simuler les conditions réelles du concours.</p>
+      </div>
+      <div class="feature-card">
+        <span class="fnum">04</span>
+        <h3>Progression sauvegardée</h3>
+        <p>Ton avancement est enregistré automatiquement sur cet appareil : reprends un examen là où tu l'as laissé.</p>
+      </div>
+    </div>`;
+
+  const stepsHtml = `
+    <div class="section-head"><h2>Comment ça marche</h2></div>
+    <div class="steps-row">
+      <div class="step-item">
+        <div class="step-num">01</div>
+        <h3>Choisis ton concours et un examen</h3>
+        <p>Médecine, ENSA, ENSAM, ENCG ou ISPITS — sélectionne la matière et l'année qui t'intéressent.</p>
+      </div>
+      <div class="step-item">
+        <div class="step-num">02</div>
+        <h3>Réponds aux QCM</h3>
+        <p>En mode cours avec correction immédiate, ou en mode examen chronométré pour te mettre en conditions réelles.</p>
+      </div>
+      <div class="step-item">
+        <div class="step-num">03</div>
+        <h3>Analyse tes résultats</h3>
+        <p>Consulte ton score, revois tes erreurs et les explications, et suis ta progression au fil des examens.</p>
+      </div>
+    </div>`;
+
+  const faqData = [
+    ["Est-ce que Suprepa est vraiment gratuit ?", "Oui. L'accès à l'ensemble des QCM, examens et corrections disponibles sur Suprepa est entièrement gratuit."],
+    ["Quels concours sont couverts ?", `Suprepa couvre actuellement ${CONCOURS_ORDER.filter(c=>byConcours(c).length).join(", ")}. D'autres concours pourront être ajoutés progressivement.`],
+    ["Quelle est la différence entre mode cours et mode examen ?", "Le mode cours te permet d'avancer à ton rythme avec correction et explication immédiates après chaque réponse. Le mode examen chronomètre ta session pour simuler les conditions réelles du concours, avec un bilan à la fin."],
+    ["Est-ce que toutes les questions sont corrigées ?", "Non, certaines questions n'ont pas encore de correction disponible. Elles restent néanmoins accessibles à l'entraînement pour t'habituer aux énoncés du concours."],
+    ["Comment vous contacter ?", `Pour toute question, suggestion ou signalement d'erreur, écris-nous à <a href="mailto:ilyaspay0@gmail.com">ilyaspay0@gmail.com</a>.`]
+  ];
+  const faqHtml = `
+    <div class="section-head" id="faq"><h2>Questions fréquentes</h2></div>
+    <div class="faq-list">
+      ${faqData.map(([q,a]) => `
+        <details class="faq-item">
+          <summary>${q}</summary>
+          <div class="faq-a">${a}</div>
+        </details>`).join("")}
+    </div>`;
+
+  app.innerHTML = `
+    <div class="home-page">
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="hero-badge"><span class="dot"></span>Plateforme gratuite · Maroc</span>
+        <h1>Prépare ton <em>concours</em>,<br>question par question.</h1>
+        <p>Banque de QCM corrigés pour les concours d'accès aux grandes écoles et facultés marocaines — mode cours pour apprendre, mode examen chronométré pour t'entraîner en conditions réelles.</p>
+        <div class="cta-row">
+          <a class="btn primary lg" href="#concours-grid">Commencer maintenant →</a>
+          <a class="btn lg" href="#/progression">Voir ma progression</a>
+        </div>
+      </div>
+      <div class="exam-cover">
+        <div class="row"><span>Candidat(e)</span><span>Toi</span></div>
+        <div class="row"><span>Concours</span><span>Au choix</span></div>
+        <div class="row"><span>Durée</span><span>Chronométrée</span></div>
+        <div class="row"><span>Questions</span><span>${totalQ.toLocaleString("fr-FR")} disponibles</span></div>
+        <div class="row"><span>Statut</span><span>Prêt</span></div>
+        <div class="stamp"><img src="images/logo-96.png" alt="Suprepa"></div>
+      </div>
+    </section>
+
+    <div class="stat-strip">
+      <div class="stat-cell"><b>${totalQ.toLocaleString("fr-FR")}</b><span>Questions</span></div>
+      <div class="stat-cell"><b>${totalExams}</b><span>Examens</span></div>
+      <div class="stat-cell"><b>${nConcours}</b><span>Concours</span></div>
+      <div class="stat-cell"><b>${totalCorrected.toLocaleString("fr-FR")}</b><span>Corrigées</span></div>
+    </div>
+
+    <div class="section-head" id="concours-grid"><h2>Choisis ton concours</h2><span class="hint">${totalExams} examens indexés</span></div>
+    <div class="grid">${cards}</div>
+    ${resumeHtml}
+    ${featuresHtml}
+    ${stepsHtml}
+    ${faqHtml}
+    </div>
+  `;
+  initScrollReveal();
+}
+
+function renderProgression(){
+  setCrumbs(`<a href="#/">Accueil</a> / Ma progression`);
+  const items = allProgress();
+
+  if (!items.length){
+    app.innerHTML = `
+      <div class="section-head"><h2>Ma progression</h2></div>
+      <div class="empty">Tu n'as pas encore commencé d'examen. <a href="#/">Choisis un concours</a> pour démarrer.</div>
+    `;
+    return;
+  }
+
+  let totalFinished = 0;
+  const rows = items.map(({exam, data}) => {
+    const answered = Object.keys(data.answers||{}).length;
+    let nCorrect = 0, nCorrectable = 0;
+    exam.questions.forEach((q,i) => {
+      if (!q.correct) return;
+      nCorrectable++;
+      if (data.answers && data.answers[i] === q.correct) nCorrect++;
+    });
+    if (data.finishedAt) totalFinished++;
+    return {exam, data, answered, nCorrect, nCorrectable};
+  }).sort((a,b) => (b.data.updatedAt||0) - (a.data.updatedAt||0));
+
+  const totalCorrect = rows.reduce((s,r)=>s+r.nCorrect,0);
+  const totalCorrectable = rows.reduce((s,r)=>s+r.nCorrectable,0);
+
+  const rowsHtml = rows.map(({exam, data, answered, nCorrect, nCorrectable}) => `
+    <div class="exam-row">
+      <div class="left">
+        <span class="year">${exam.annee}</span>
+        <div>
+          <div style="font-weight:600;">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)}</div>
+          <div class="n">${answered} / ${exam.n} répondues${data.finishedAt ? " · terminé" : " · en cours"}${nCorrectable ? ` · score ${nCorrect}/${nCorrectable}` : ""}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="#/exam/${exam.id}/${data.mode||'cours'}">${data.finishedAt ? "Revoir" : "Continuer"}</a>
+      </div>
+    </div>`).join("");
+
+  app.innerHTML = `
+    <div class="section-head"><h2>Ma progression</h2><span class="hint">${items.length} examen${items.length>1?"s":""} entamé${items.length>1?"s":""}</span></div>
+    <div class="summary-grid" style="margin-bottom:32px;">
+      <div class="summary-stat"><b>${items.length}</b><span>Examens entamés</span></div>
+      <div class="summary-stat"><b>${totalFinished}</b><span>Terminés</span></div>
+      <div class="summary-stat"><b>${totalCorrectable ? Math.round(100*totalCorrect/totalCorrectable)+"%" : "—"}</b><span>Taux de réussite (corrigées)</span></div>
+    </div>
+    ${rowsHtml}
+  `;
+  animateCounters();
+}
+
+function renderConcours(concours){
+  setCrumbs(`<a href="#/">Accueil</a> / ${escapeHtml(concours)}`);
+  const matieres = matieresOf(concours);
+  if (!matieres.length){
+    app.innerHTML = `<a class="backlink" href="#/">&larr; Accueil</a><div class="empty">Aucun examen pour ce concours.</div>`;
+    return;
+  }
+  const cards = matieres.map(m => {
+    const exams = byMatiere(concours, m);
+    const q = exams.reduce((s,e)=>s+e.n,0);
+    const years = [...new Set(exams.map(e=>e.annee))].sort();
+    return `
+      <a class="card" href="#/concours/${encodeURIComponent(concours)}/${encodeURIComponent(m)}">
+        <span class="eyebrow">${years[0]}–${years[years.length-1]}</span>
+        <h3>${escapeHtml(m)}</h3>
+        <div class="meta">${exams.length} examen${exams.length>1?"s":""} · ${q} questions</div>
+      </a>`;
+  }).join("");
+
+  app.innerHTML = `
+    <a class="backlink" href="#/">&larr; Tous les concours</a>
+    <div class="section-head"><h2>${escapeHtml(concours)}</h2><span class="hint">${CONCOURS_DESC[concours]||""}</span></div>
+    <div class="grid">${cards}</div>
+  `;
+}
+
+function renderMatiere(concours, matiere){
+  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/concours/${encodeURIComponent(concours)}">${escapeHtml(concours)}</a> / ${escapeHtml(matiere)}`);
+  const exams = byMatiere(concours, matiere).sort((a,b)=> b.annee.localeCompare(a.annee));
+
+  const rows = exams.map(e => {
+    const progress = loadProgress(e.id);
+    const answered = Object.keys(progress.answers||{}).length;
+    return `
+      <div class="exam-row">
+        <div class="left">
+          <span class="year">${e.annee}</span>
+          <div>
+            <div style="font-weight:600;">${escapeHtml(e.matiere)} ${e.annee}</div>
+            <div class="n">${e.n} questions${answered ? ` · ${answered} traitées` : ""}</div>
+          </div>
+        </div>
+        <div class="actions">
+          <a class="btn" href="#/exam/${e.id}">Ouvrir</a>
+        </div>
+      </div>`;
+  }).join("");
+
+  app.innerHTML = `
+    <a class="backlink" href="#/concours/${encodeURIComponent(concours)}">&larr; ${escapeHtml(concours)}</a>
+    <div class="section-head"><h2>${escapeHtml(matiere)}</h2><span class="hint">${exams.length} examens</span></div>
+    ${rows || '<div class="empty">Aucun examen.</div>'}
+  `;
+}
+
+function renderModePicker(examId){
+  const exam = examById(examId);
+  if (!exam) return renderHome();
+  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/concours/${encodeURIComponent(exam.concours)}">${escapeHtml(exam.concours)}</a> / ${escapeHtml(exam.matiere)} ${exam.annee}`);
+
+  const nCorrected = exam.nCorrected || 0;
+  const noticeHtml = nCorrected === exam.n
+    ? `<div class="notice">Les ${exam.n} questions de cet examen sont corrigées avec explication.</div>`
+    : nCorrected > 0
+      ? `<div class="notice">${nCorrected} question${nCorrected>1?"s":""} sur ${exam.n} sont corrigées avec explication ; les autres restent disponibles en entraînement sans validation automatique.</div>`
+      : `<div class="notice">Aucune correction disponible pour le moment sur cet examen — tu peux quand même t'entraîner sur les énoncés.</div>`;
+
+  app.innerHTML = `
+    <a class="backlink" href="#/concours/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}">&larr; ${escapeHtml(exam.matiere)}</a>
+    <div class="section-head"><h2>${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${exam.annee}</h2><span class="hint">${exam.n} questions</span></div>
+    ${noticeHtml}
+    <div class="mode-grid">
+      <a class="mode-card" href="#/exam/${exam.id}/cours">
+        <span class="icon">Mode cours</span>
+        <h3>Question par question</h3>
+        <p>Avance à ton rythme, reviens en arrière, pas de chronomètre. Idéal pour découvrir les notions.</p>
+        <span class="btn primary">Commencer</span>
+      </a>
+      <a class="mode-card" href="#/exam/${exam.id}/examen">
+        <span class="icon">Mode examen</span>
+        <h3>Chronométré</h3>
+        <p>${exam.n} questions, ${Math.round(exam.n*1.5)} minutes. Simule les conditions réelles du concours.</p>
+        <span class="btn gold">Démarrer le chrono</span>
+      </a>
+    </div>
+  `;
+}
+
+function renderSession(examId, mode){
+  const exam = examById(examId);
+  if (!exam) return renderHome();
+  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/exam/${exam.id}">${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${exam.annee}</a> / ${mode === "examen" ? "Examen" : "Cours"}`);
+
+  const progress = loadProgress(examId);
+  const state = {
+    idx: 0,
+    answers: progress.answers || {},
+    flagged: progress.flagged || {},
+    mode,
+    secondsLeft: mode === "examen" ? Math.round(exam.n * 90) : null,
+    finished: false,
+    reviewMode: !!progress.finishedAt
+  };
+
+  function persist(finishedNow){
+    saveProgress(examId, {
+      answers: state.answers,
+      flagged: state.flagged,
+      mode,
+      updatedAt: Date.now(),
+      finishedAt: finishedNow ? Date.now() : (progress.finishedAt || null)
+    });
+  }
+
+  function renderQuestion(){
+    if (state.finished) return renderSummary();
+    const q = exam.questions[state.idx];
+    const selected = state.answers[state.idx];
+    const total = exam.questions.length;
+
+    // Reveal correction: always in review mode, or immediately in cours mode once answered.
+    const reveal = !!(state.reviewMode || (mode === "cours" && selected));
+    const hasCorrection = !!q.correct;
+
+    const optionsHtml = q.options.map(o => {
+      let cls = selected === o.letter ? "selected" : "";
+      if (reveal && hasCorrection){
+        if (o.letter === q.correct) cls += " correct";
+        else if (o.letter === selected) cls += " incorrect";
+      }
+      return `
+      <button class="option ${cls}" data-letter="${o.letter}">
+        <span class="letter">${o.letter}</span>
+        <span>${o.text}</span>
+      </button>`;
+    }).join("");
+
+    let correctionHtml = "";
+    if (reveal){
+      if (hasCorrection){
+        const isRight = selected === q.correct;
+        correctionHtml = `
+          <div class="notice" style="border-color:${isRight? 'var(--green)':'var(--red)'};">
+            <b style="color:${isRight? 'var(--green)':'var(--red)'};">${selected ? (isRight ? "Bonne réponse !" : "Ce n'est pas la bonne réponse.") : "Correction"} — réponse correcte : ${q.correct}</b>
+            ${q.explanation ? `<div style="margin-top:8px;">${q.explanation}</div>` : ""}
+          </div>`;
+      } else {
+        correctionHtml = `<div class="notice">Correction non disponible pour cette question.</div>`;
+      }
+    }
+
+    app.innerHTML = `
+      <div class="session-head">
+        <div>
+          <div class="title">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.annee}</div>
+          <div class="sub">${mode === "examen" ? (state.reviewMode ? "Revue de l'examen" : "Mode examen chronométré") : "Mode cours"} — question ${state.idx+1} / ${total}</div>
+        </div>
+        ${mode === "examen" && !state.reviewMode ? `<div class="timer" id="timer">${fmtTime(state.secondsLeft)}</div>` : ""}
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${(state.idx+1)/total*100}%"></div></div>
+
+      <div class="question-card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <span class="qnum" style="margin-bottom:0;">${q.num} · Question ${state.idx+1} sur ${total}${hasCorrection ? " · Corrigée" : ""}</span>
+          <button class="flag-btn ${state.flagged[state.idx] ? "on":""}" id="flagBtn" title="Marquer pour révision (touche F)">${state.flagged[state.idx] ? "★ Marquée" : "☆ Marquer"}</button>
+        </div>
+        <div class="qtext"><p>${q.text}</p></div>
+        <div class="options">${optionsHtml}</div>
+        ${correctionHtml}
+        <div class="kbd-hint">Raccourcis : <kbd>A</kbd><kbd>B</kbd><kbd>C</kbd><kbd>D</kbd> répondre · <kbd>←</kbd><kbd>→</kbd> naviguer · <kbd>F</kbd> marquer</div>
+        <div class="swipe-hint">← Glisse pour changer de question →</div>
+      </div>
+
+      <div class="session-nav" style="margin-top:20px;">
+        <button class="btn" id="prevBtn" ${state.idx===0 ? "disabled":""}>&larr; Précédente</button>
+        <span class="mid">${Object.keys(state.answers).length} / ${total} répondues</span>
+        <button class="btn primary" id="nextBtn">${state.idx === total-1 ? (state.reviewMode ? "Terminer la revue" : "Terminer") : "Suivante →"}</button>
+      </div>
+    `;
+    renderMath();
+
+    function selectOption(letter){
+      if (state.reviewMode && mode === "examen") return; // read-only review of a timed exam
+      state.answers[state.idx] = letter;
+      persist();
+      renderQuestion();
+    }
+
+    app.querySelectorAll(".option").forEach(btn => {
+      btn.addEventListener("click", () => selectOption(btn.dataset.letter));
+    });
+    $("#flagBtn").addEventListener("click", () => {
+      if (state.flagged[state.idx]) delete state.flagged[state.idx];
+      else state.flagged[state.idx] = true;
+      persist();
+      renderQuestion();
+    });
+    $("#prevBtn").addEventListener("click", () => { if(state.idx>0){ state.idx--; renderQuestion(); }});
+    $("#nextBtn").addEventListener("click", () => {
+      if (state.idx < total-1){ state.idx++; renderQuestion(); }
+      else { state.finished = true; state.reviewMode = true; persist(true); renderQuestion(); }
+    });
+
+    // Swipe gauche/droite pour naviguer entre les questions (mobile)
+    enableSwipeNav($(".question-card"), {
+      onNext: () => { if (state.idx < total-1){ state.idx++; renderQuestion(); } },
+      onPrev: () => { if (state.idx > 0){ state.idx--; renderQuestion(); } }
+    });
+  }
+
+  function renderSummary(){
+    if (examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; }
+    const total = exam.questions.length;
+    const answered = Object.keys(state.answers).length;
+    const skipped = total - answered;
+
+    const correctable = exam.questions.filter(q => q.correct);
+    let nCorrect = 0, nWrong = 0;
+    exam.questions.forEach((q, i) => {
+      if (!q.correct) return;
+      const given = state.answers[i];
+      if (given && given === q.correct) nCorrect++;
+      else if (given) nWrong++;
+    });
+
+    const scoreBlock = correctable.length
+      ? `<div class="summary-stat"><b>${nCorrect} / ${correctable.length}</b><span>Score (corrigées)</span></div>`
+      : `<div class="summary-stat"><b>—</b><span>Aucune correction dispo</span></div>`;
+
+    const flaggedIdx = Object.keys(state.flagged || {}).map(Number).sort((a,b)=>a-b);
+    const flaggedHtml = flaggedIdx.length ? `
+      <div class="section-head" style="margin-top:32px;"><h2 style="font-size:18px;">Questions marquées</h2><span class="hint">${flaggedIdx.length}</span></div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(90px,1fr));">
+        ${flaggedIdx.map(i => `<a class="btn ghost" style="text-align:center;" href="#/exam/${exam.id}/${mode}" data-goto="${i}">${exam.questions[i].num}</a>`).join("")}
+      </div>` : "";
+
+    app.innerHTML = `
+      <div class="session-head">
+        <div>
+          <div class="title">Session terminée</div>
+          <div class="sub">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.annee}</div>
+        </div>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-stat"><b>${total}</b><span>Questions</span></div>
+        <div class="summary-stat"><b>${answered}</b><span>Répondues</span></div>
+        ${scoreBlock}
+      </div>
+      <div class="notice">${correctable.length ? `${correctable.length} question${correctable.length>1?"s":""} sur ${total} avaient une correction disponible.` : "Aucune question de cet examen n'est corrigée pour le moment."} Revois tes réponses en détail ci-dessous.</div>
+      ${flaggedHtml}
+      <div class="session-nav" style="margin-top:24px;">
+        <a class="btn" href="#/exam/${exam.id}/${mode}">&larr; Revoir les réponses</a>
+        <a class="btn primary" href="#/concours/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}">Autres examens</a>
+      </div>
+    `;
+    animateCounters();
+  }
+
+  if (mode === "examen" && state.secondsLeft !== null){
+    examTimerHandle = setInterval(() => {
+      state.secondsLeft--;
+      const t = $("#timer");
+      if (t){
+        t.textContent = fmtTime(state.secondsLeft);
+        if (state.secondsLeft <= 60) t.classList.add("low");
+      }
+      if (state.secondsLeft <= 0){
+        clearInterval(examTimerHandle);
+        state.finished = true;
+        state.reviewMode = true;
+        persist(true);
+        renderSummary();
+      }
+    }, 1000);
+  }
+
+  sessionKeyHandler = (e) => {
+    if (state.finished) return;
+    const total = exam.questions.length;
+    const tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    const letter = {a:"A",b:"B",c:"C",d:"D","1":"A","2":"B","3":"C","4":"D"}[e.key.toLowerCase()];
+    if (letter){
+      const q = exam.questions[state.idx];
+      if (q.options.some(o => o.letter === letter)){
+        if (!(state.reviewMode && mode === "examen")){
+          state.answers[state.idx] = letter;
+          persist();
+          renderQuestion();
+        }
+      }
+    } else if (e.key === "ArrowRight"){
+      if (state.idx < total-1){ state.idx++; renderQuestion(); }
+    } else if (e.key === "ArrowLeft"){
+      if (state.idx > 0){ state.idx--; renderQuestion(); }
+    } else if (e.key.toLowerCase() === "f"){
+      if (state.flagged[state.idx]) delete state.flagged[state.idx];
+      else state.flagged[state.idx] = true;
+      persist();
+      renderQuestion();
+    }
+  };
+  document.addEventListener("keydown", sessionKeyHandler);
+
+  renderQuestion();
+}
+
+route();
+
+// ---------- Global search ----------
+(function initSearch(){
+  const input = document.getElementById("globalSearch");
+  const results = document.getElementById("searchResults");
+  if (!input || !results) return;
+
+  function norm(s){
+    return (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  }
+
+  function search(q){
+    q = norm(q).trim();
+    if (!q) return [];
+    return EXAMS_DB.filter(e =>
+      norm(e.concours).includes(q) ||
+      norm(e.matiere).includes(q) ||
+      norm(e.annee).includes(q) ||
+      norm(e.concours+" "+e.matiere+" "+e.annee).includes(q)
+    ).slice(0, 8);
+  }
+
+  function render(list, q){
+    if (!list.length){
+      results.innerHTML = `<div class="search-empty">Aucun résultat pour « ${escapeHtml(q)} »</div>`;
+      results.classList.add("open");
+      return;
+    }
+    results.innerHTML = list.map(e => `
+      <a href="#/exam/${e.id}">
+        <div>${escapeHtml(e.concours)} · ${escapeHtml(e.matiere)} ${e.annee}</div>
+        <div class="sr-meta">${e.n} questions${e.nCorrected ? ` · ${e.nCorrected} corrigées` : ""}</div>
+      </a>`).join("");
+    results.classList.add("open");
+  }
+
+  input.addEventListener("input", () => {
+    const list = search(input.value);
+    if (input.value.trim()) render(list, input.value.trim());
+    else results.classList.remove("open");
+  });
+  input.addEventListener("focus", () => { if (input.value.trim()) results.classList.add("open"); });
+  document.addEventListener("click", (e) => {
+    if (!results.contains(e.target) && e.target !== input) results.classList.remove("open");
+  });
+  results.addEventListener("click", () => { results.classList.remove("open"); input.value=""; });
+  input.addEventListener("keydown", (e) => { if (e.key === "Escape"){ input.blur(); results.classList.remove("open"); } });
+})();
