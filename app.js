@@ -155,6 +155,18 @@ function examById(id){
   return EXAMS_DB.find(e => e.id === id);
 }
 
+// ---------- "Questions inédites" (Original Suprepa) ----------
+function ineditConcoursList(){
+  return CONCOURS_ORDER.filter(c => EXAMS_DB.some(e => e.concours === c && e.source === "suprepa"));
+}
+function ineditMatieresOf(concours){
+  const set = [...new Set(EXAMS_DB.filter(e => e.concours === concours && e.source === "suprepa").map(e => e.matiere))];
+  return set.sort();
+}
+function byIneditMatiere(concours, matiere){
+  return EXAMS_DB.filter(e => e.concours === concours && e.matiere === matiere && e.source === "suprepa");
+}
+
 // ---------- Remote data (server-only — jamais expédiées en un seul fichier) ----------
 // EXAMS_DB ne contient que les métadonnées (pas les questions ni les corrections).
 // Les questions et corrections sont chargées à la demande via /api, examen par examen,
@@ -246,6 +258,9 @@ function route(){
   const parts = parseHash();
   if (parts.length === 0) return renderHome();
   if (parts[0] === "progression") return renderProgression();
+  if (parts[0] === "inedit" && parts.length === 1) return renderInedit();
+  if (parts[0] === "inedit" && parts.length === 2) return renderIneditConcours(parts[1]);
+  if (parts[0] === "inedit" && parts.length === 3) return renderIneditMatiere(parts[1], parts[2]);
   if (parts[0] === "concours" && parts.length === 2) return renderConcours(parts[1]);
   if (parts[0] === "concours" && parts.length === 3) return renderMatiere(parts[1], parts[2]);
   if (parts[0] === "exam" && parts.length === 2) return renderModePicker(parts[1]);
@@ -431,7 +446,7 @@ function renderProgression(){
     const rowsHtml = rows.map(({exam, data, answered, nCorrect, nCorrectable}) => `
       <div class="exam-row">
         <div class="left">
-          <span class="year">${exam.annee}</span>
+          ${exam.source === "suprepa" ? `<span class="badge-original">Original</span>` : `<span class="year">${exam.annee}</span>`}
           <div>
             <div style="font-weight:600;">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)}</div>
             <div class="n">${answered} / ${exam.n} répondues${data.finishedAt ? " · terminé" : " · en cours"}${nCorrectable ? ` · score ${nCorrect}/${nCorrectable}` : ""}</div>
@@ -510,10 +525,96 @@ function renderMatiere(concours, matiere){
   `;
 }
 
+function renderInedit(){
+  setCrumbs(`<a href="#/">Accueil</a> / Questions inédites`);
+  const concoursList = ineditConcoursList();
+
+  const cards = concoursList.map(c => {
+    const exams = EXAMS_DB.filter(e => e.concours === c && e.source === "suprepa");
+    const q = exams.reduce((s,e)=>s+e.n,0);
+    return `
+      <a class="card concours-card" href="#/inedit/${encodeURIComponent(c)}">
+        <span class="eyebrow">${ineditMatieresOf(c).length} matière${ineditMatieresOf(c).length>1?"s":""}</span>
+        <h3>${c}</h3>
+        <div class="meta">${CONCOURS_DESC[c]||""}</div>
+        <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
+      </a>`;
+  }).join("");
+
+  app.innerHTML = `
+    <div class="inedit-hero">
+      <span class="badge-original">Original Suprepa</span>
+      <div class="section-head" style="margin:12px 0 0;"><h2 style="margin:0;">Questions inédites</h2></div>
+      <p>Des QCM entièrement inédits, écrits dans l'esprit des concours marocains — <b>jamais tombés</b> dans une vraie session. Idéal pour tester ta compréhension au-delà des annales déjà connues, avec une correction et une explication systématiques sur chaque question.</p>
+    </div>
+    ${concoursList.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Aucune question inédite disponible pour le moment.</div>'}
+  `;
+}
+
+function renderIneditConcours(concours){
+  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/inedit">Questions inédites</a> / ${escapeHtml(concours)}`);
+  const matieres = ineditMatieresOf(concours);
+  if (!matieres.length){
+    app.innerHTML = `<a class="backlink" href="#/inedit">&larr; Questions inédites</a><div class="empty">Aucune question inédite pour ce concours.</div>`;
+    return;
+  }
+  const cards = matieres.map(m => {
+    const exams = byIneditMatiere(concours, m);
+    const q = exams.reduce((s,e)=>s+e.n,0);
+    return `
+      <a class="card" href="#/inedit/${encodeURIComponent(concours)}/${encodeURIComponent(m)}">
+        <span class="badge-original" style="margin-bottom:8px;">Original Suprepa</span>
+        <h3>${escapeHtml(m)}</h3>
+        <div class="meta">${exams.length} lot${exams.length>1?"s":""} · ${q} questions</div>
+      </a>`;
+  }).join("");
+
+  app.innerHTML = `
+    <a class="backlink" href="#/inedit">&larr; Questions inédites</a>
+    <div class="section-head"><h2>${escapeHtml(concours)}</h2><span class="hint">Questions inédites, jamais tombées en concours</span></div>
+    <div class="grid">${cards}</div>
+  `;
+}
+
+function renderIneditMatiere(concours, matiere){
+  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/inedit">Questions inédites</a> / <a href="#/inedit/${encodeURIComponent(concours)}">${escapeHtml(concours)}</a> / ${escapeHtml(matiere)}`);
+  const exams = byIneditMatiere(concours, matiere);
+
+  const rows = exams.map(e => {
+    const progress = loadProgress(e.id);
+    const answered = Object.keys(progress.answers||{}).length;
+    return `
+      <div class="exam-row">
+        <div class="left">
+          <span class="badge-original">Original Suprepa</span>
+          <div>
+            <div style="font-weight:600;">${escapeHtml(e.matiere)} — ${e.annee}</div>
+            <div class="n">${e.n} questions, 100% corrigées${answered ? ` · ${answered} traitées` : ""}</div>
+          </div>
+        </div>
+        <div class="actions">
+          <a class="btn" href="#/exam/${e.id}">Ouvrir</a>
+        </div>
+      </div>`;
+  }).join("");
+
+  app.innerHTML = `
+    <a class="backlink" href="#/inedit/${encodeURIComponent(concours)}">&larr; ${escapeHtml(concours)}</a>
+    <div class="section-head"><h2>${escapeHtml(matiere)}</h2><span class="hint">${exams.length} lot${exams.length>1?"s":""} inédit${exams.length>1?"s":""}</span></div>
+    ${rows || '<div class="empty">Aucun lot disponible.</div>'}
+  `;
+}
+
 function renderModePicker(examId){
   const exam = examById(examId);
   if (!exam) return renderHome();
-  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/concours/${encodeURIComponent(exam.concours)}">${escapeHtml(exam.concours)}</a> / ${escapeHtml(exam.matiere)} ${exam.annee}`);
+  const isOriginal = exam.source === "suprepa";
+  const backHref = isOriginal
+    ? `#/inedit/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}`
+    : `#/concours/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}`;
+  setCrumbs(isOriginal
+    ? `<a href="#/">Accueil</a> / <a href="#/inedit">Questions inédites</a> / <a href="#/inedit/${encodeURIComponent(exam.concours)}">${escapeHtml(exam.concours)}</a> / ${escapeHtml(exam.matiere)}`
+    : `<a href="#/">Accueil</a> / <a href="#/concours/${encodeURIComponent(exam.concours)}">${escapeHtml(exam.concours)}</a> / ${escapeHtml(exam.matiere)} ${exam.annee}`);
 
   const nCorrected = exam.nCorrected || 0;
   const noticeHtml = nCorrected === exam.n
@@ -523,8 +624,11 @@ function renderModePicker(examId){
       : `<div class="notice">Aucune correction disponible pour le moment sur cet examen — tu peux quand même t'entraîner sur les énoncés.</div>`;
 
   app.innerHTML = `
-    <a class="backlink" href="#/concours/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}">&larr; ${escapeHtml(exam.matiere)}</a>
-    <div class="section-head"><h2>${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${exam.annee}</h2><span class="hint">${exam.n} questions</span></div>
+    <a class="backlink" href="${backHref}">&larr; ${escapeHtml(exam.matiere)}</a>
+    <div class="section-head">
+      <h2>${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${isOriginal ? "" : exam.annee}</h2>
+      <span class="hint">${isOriginal ? `<span class="badge-original">Original Suprepa</span>` : `${exam.n} questions`}</span>
+    </div>
     ${noticeHtml}
     <div class="mode-grid">
       <a class="mode-card" href="#/exam/${exam.id}/cours">
@@ -634,7 +738,7 @@ async function renderSession(examId, mode){
     app.innerHTML = `
       <div class="session-head">
         <div>
-          <div class="title">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.annee}</div>
+          <div class="title">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.source === "suprepa" ? `<span class="badge-original" style="margin-left:6px;">Original Suprepa</span>` : exam.annee}</div>
           <div class="sub">${mode === "examen" ? (state.reviewMode ? "Revue de l'examen" : "Mode examen chronométré") : "Mode cours"} — question ${state.idx+1} / ${total}</div>
         </div>
         ${mode === "examen" && !state.reviewMode ? `<div class="timer" id="timer">${fmtTime(state.secondsLeft)}</div>` : ""}
@@ -723,7 +827,7 @@ async function renderSession(examId, mode){
       <div class="session-head">
         <div>
           <div class="title">Session terminée</div>
-          <div class="sub">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.annee}</div>
+          <div class="sub">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.source === "suprepa" ? `<span class="badge-original" style="margin-left:6px;">Original Suprepa</span>` : exam.annee}</div>
         </div>
       </div>
       <div class="summary-grid">
@@ -735,7 +839,7 @@ async function renderSession(examId, mode){
       ${flaggedHtml}
       <div class="session-nav" style="margin-top:24px;">
         <a class="btn" href="#/exam/${exam.id}/${mode}">&larr; Revoir les réponses</a>
-        <a class="btn primary" href="#/concours/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}">Autres examens</a>
+        <a class="btn primary" href="${exam.source === "suprepa" ? `#/inedit/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}` : `#/concours/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}`}">Autres examens</a>
       </div>
     `;
     animateCounters();

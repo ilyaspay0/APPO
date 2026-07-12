@@ -616,6 +616,17 @@
     .hero-copy h1{ font-size:26px; }
     .card.concours-card .count{ font-size:24px; }
   }
+  /* ---------- Badge "Original Suprepa" ---------- */
+  .badge-original{
+    display:inline-flex; align-items:center; gap:5px; background:linear-gradient(135deg,var(--gold),var(--gold-deep));
+    color:#fff; font-family:var(--font-mono); font-size:10.5px; font-weight:700; letter-spacing:.4px;
+    text-transform:uppercase; border-radius:20px; padding:3px 10px; white-space:nowrap;
+  }
+  .inedit-hero{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:28px 26px; margin-bottom:32px;
+  }
+  .inedit-hero p{ color:var(--ink-soft); font-size:14.5px; max-width:65ch; margin:10px 0 0; line-height:1.6; }
 </style>
 </head>
 <body>
@@ -627,6 +638,7 @@
       <div class="brand-name">Suprepa<small>Concours Maroc</small></div>
     </a>
     <div class="topbar-right">
+      <a class="nav-link" href="#/inedit">Questions inédites</a>
       <a class="nav-link" href="#/progression">Ma progression</a>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Changer de thème" title="Changer de thème">🌙</button>
       <div class="search-wrap">
@@ -654,6 +666,7 @@
         <h4>Navigation</h4>
         <ul>
           <li><a href="#/">Accueil</a></li>
+          <li><a href="#/inedit">Questions inédites</a></li>
           <li><a href="#/progression">Ma progression</a></li>
           <li><a href="#concours-grid">Choisir un concours</a></li>
           <li><a href="#faq">Questions fréquentes</a></li>

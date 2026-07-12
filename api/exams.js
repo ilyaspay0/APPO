@@ -7,7 +7,8 @@ const META = EXAMS.map(e => ({
   matiere: e.matiere,
   annee: e.annee,
   n: e.n,
-  nCorrected: e.nCorrected
+  nCorrected: e.nCorrected,
+  source: e.source || "archive"
 }));
 
 module.exports = (req, res) => {
