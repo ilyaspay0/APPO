@@ -55,9 +55,6 @@
 </script>
 <script defer src="/_vercel/insights/script.js"></script>
 
-<!-- Vercel Speed Insights -->
-<script defer src="/_vercel/speed-insights/script.js"></script>
-
 <!-- Apply saved/system theme before first paint to avoid a flash -->
 <script>
 (function(){
@@ -630,7 +627,45 @@
     box-shadow:var(--shadow); padding:28px 26px; margin-bottom:32px;
   }
   .inedit-hero p{ color:var(--ink-soft); font-size:14.5px; max-width:65ch; margin:10px 0 0; line-height:1.6; }
+
+  /* ---------- Auth: header button + modal ---------- */
+  .auth-btn{
+    font-family:var(--font-mono); font-size:12.5px; font-weight:600; color:#fff; background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.25); border-radius:7px; padding:7px 14px;
+  }
+  .auth-btn:hover{ background:rgba(255,255,255,.24); }
+  .auth-user{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:#DCE8FB; font-family:var(--font-mono); }
+  .auth-user .auth-email{ max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .auth-user button{ background:transparent; border:1px solid rgba(255,255,255,.3); color:#DCE8FB; border-radius:6px; padding:4px 10px; font-size:11.5px; }
+  .auth-user button:hover{ color:#fff; border-color:#fff; }
+
+  .auth-overlay{
+    position:fixed; inset:0; background:rgba(15,42,74,.55); z-index:100;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .auth-overlay[hidden]{ display:none; }
+  .auth-modal{
+    background:var(--paper-raised); border-radius:14px; box-shadow:var(--shadow);
+    padding:30px 28px; width:100%; max-width:380px; position:relative;
+  }
+  .auth-close{
+    position:absolute; top:14px; right:14px; background:transparent; border:none;
+    font-size:16px; color:var(--ink-soft); width:28px; height:28px; border-radius:6px;
+  }
+  .auth-close:hover{ background:var(--paper); color:var(--ink); }
+  .auth-modal h3{ font-family:var(--font-display); font-size:22px; margin:0 0 6px; }
+  .auth-sub{ font-size:13px; color:var(--ink-soft); margin:0 0 20px; }
+  .auth-google-btn{ width:100%; justify-content:center; gap:10px; background:#fff; border-color:var(--line); }
+  .auth-divider{ display:flex; align-items:center; gap:10px; margin:18px 0; color:var(--ink-soft); font-size:12px; font-family:var(--font-mono); }
+  .auth-divider::before, .auth-divider::after{ content:""; flex:1; height:1px; background:var(--line); }
+  .auth-label{ display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin:12px 0 5px; }
+  .auth-input{ background:var(--paper); border:1px solid var(--line); }
+  .auth-error{ color:var(--red); font-size:12.5px; margin-top:10px; }
+  .auth-switch{ text-align:center; font-size:13px; color:var(--ink-soft); margin:18px 0 0; }
+  .auth-link-btn{ background:transparent; border:none; color:var(--gold-deep); font-weight:600; padding:0; margin-left:4px; }
+  .auth-link-btn:hover{ text-decoration:underline; }
 </style>
+<script defer src="/_vercel/speed-insights/script.js"></script>
 </head>
 <body>
 
@@ -643,6 +678,7 @@
     <div class="topbar-right">
       <a class="nav-link" href="#/inedit">Questions inédites</a>
       <a class="nav-link" href="#/progression">Ma progression</a>
+      <div id="authArea"></div>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Changer de thème" title="Changer de thème">🌙</button>
       <div class="search-wrap">
         <input class="search-input" id="globalSearch" type="text" placeholder="Chercher un concours, une matière…" autocomplete="off">
@@ -688,6 +724,45 @@
   </div>
 </footer>
 
+<!-- ---------- Modal de connexion / inscription ---------- -->
+<div id="authModalOverlay" class="auth-overlay" hidden>
+  <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+    <button class="auth-close" id="authCloseBtn" type="button" aria-label="Fermer">✕</button>
+    <h3 id="authModalTitle">Se connecter</h3>
+    <p class="auth-sub">Synchronise ta progression entre ton téléphone et ton ordinateur.</p>
+
+    <button class="btn auth-google-btn" id="authGoogleBtn" type="button">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9C16.64 14.2 17.64 11.9 17.64 9.2z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.36 0-4.36-1.6-5.07-3.74H.9v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.93 10.68A5.4 5.4 0 0 1 3.65 9c0-.58.1-1.15.28-1.68V4.99H.9A9 9 0 0 0 0 9c0 1.45.35 2.83.9 4.01l3.03-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .9 4.99l3.03 2.33C4.64 5.18 6.64 3.58 9 3.58z"/></svg>
+      Continuer avec Google
+    </button>
+
+    <div class="auth-divider"><span>ou</span></div>
+
+    <form id="authForm">
+      <label class="auth-label">Email</label>
+      <input class="search-input auth-input" id="authEmail" type="email" required autocomplete="email" style="width:100%;color:var(--ink);">
+      <label class="auth-label">Mot de passe</label>
+      <input class="search-input auth-input" id="authPassword" type="password" required minlength="6" autocomplete="current-password" style="width:100%;color:var(--ink);">
+      <div id="authError" class="auth-error" hidden></div>
+      <button class="btn primary" id="authSubmitBtn" type="submit" style="width:100%; justify-content:center; margin-top:14px;">Se connecter</button>
+    </form>
+
+    <p class="auth-switch">
+      <span id="authSwitchText">Pas encore de compte ?</span>
+      <button type="button" id="authSwitchBtn" class="auth-link-btn">Créer un compte</button>
+    </p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // TODO : remplace ces valeurs par celles de TON projet Supabase
+  // (Supabase Dashboard → Project Settings → API)
+  window.SUPABASE_CONFIG = {
+    url: "https://pxlmtyhwqmbqenyytgos.supabase.co",
+    anonKey: "sb_publishable_6eCvwSzX4P4UK6n2SuVOrA_F60J1ZVO"
+  };
+</script>
 <script src="app.js"></script>
 </body>
 </html>

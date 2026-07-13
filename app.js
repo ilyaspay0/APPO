@@ -206,6 +206,7 @@ function loadProgress(examId){
 }
 function saveProgress(examId, data){
   try{ localStorage.setItem("prepari:progress:"+examId, JSON.stringify(data)); }catch(e){}
+  scheduleCloudPush(examId, data);
 }
 function allProgress(){
   const out = [];
@@ -222,6 +223,176 @@ function allProgress(){
     }
   }catch(e){}
   return out;
+}
+
+// ---------- Authentification & synchronisation cloud (Supabase) ----------
+// Permet à un étudiant connecté de retrouver sa progression sur un autre appareil.
+// Fonctionne en mode "invité" (localStorage uniquement) si Supabase n'est pas configuré.
+let sbClient = null, currentUser = null;
+const cloudSyncTimers = {};
+
+function initSupabase(){
+  try{
+    if (!window.supabase || !window.SUPABASE_CONFIG || window.SUPABASE_CONFIG.url === "REMPLACE_MOI"){
+      return; // Supabase pas configuré : le site continue de fonctionner en mode invité (localStorage).
+    }
+    sbClient = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+    sbClient.auth.getSession().then(({data}) => {
+      onAuthChanged(data && data.session ? data.session.user : null);
+    });
+    sbClient.auth.onAuthStateChange((_event, session) => {
+      onAuthChanged(session ? session.user : null);
+    });
+  }catch(e){ console.warn("Supabase init failed", e); }
+}
+
+async function onAuthChanged(user){
+  currentUser = user;
+  renderAuthArea();
+  if (user) await mergeCloudProgress(user.id);
+}
+
+function renderAuthArea(){
+  const el = document.getElementById("authArea");
+  if (!el) return;
+  if (currentUser){
+    el.innerHTML = `
+      <div class="auth-user">
+        <span class="auth-email">${escapeHtml(currentUser.email || "Connecté")}</span>
+        <button id="authSignOutBtn" type="button">Se déconnecter</button>
+      </div>`;
+    document.getElementById("authSignOutBtn").addEventListener("click", () => sbClient && sbClient.auth.signOut());
+  } else {
+    el.innerHTML = `<button class="auth-btn" id="authOpenBtn" type="button" title="Facultatif — connecte-toi pour garder ta progression entre ton téléphone et ton ordinateur">Se connecter</button>`;
+    document.getElementById("authOpenBtn").addEventListener("click", openAuthModal);
+  }
+}
+
+let authMode = "login";
+function openAuthModal(){
+  if (!sbClient){
+    alert("La connexion n'est pas encore configurée sur ce site. Réessaie plus tard.");
+    return;
+  }
+  const overlay = document.getElementById("authModalOverlay");
+  const err = document.getElementById("authError");
+  if (err) err.hidden = true;
+  if (overlay) overlay.hidden = false;
+}
+function closeAuthModal(){
+  const overlay = document.getElementById("authModalOverlay");
+  if (overlay) overlay.hidden = true;
+}
+function setAuthMode(mode){
+  authMode = mode;
+  document.getElementById("authModalTitle").textContent = mode === "signup" ? "Créer un compte" : "Se connecter";
+  document.getElementById("authSubmitBtn").textContent = mode === "signup" ? "Créer mon compte" : "Se connecter";
+  document.getElementById("authSwitchText").textContent = mode === "signup" ? "Déjà un compte ?" : "Pas encore de compte ?";
+  document.getElementById("authSwitchBtn").textContent = mode === "signup" ? "Se connecter" : "Créer un compte";
+}
+function showAuthError(msg){
+  const el = document.getElementById("authError");
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
+}
+function authErrorMessage(e){
+  const msg = (e && e.message) || "";
+  if (msg.includes("Invalid login credentials")) return "Email ou mot de passe incorrect.";
+  if (msg.includes("already registered") || msg.includes("already exists")) return "Un compte existe déjà avec cet email.";
+  if (msg.includes("Password should be at least")) return "Le mot de passe doit contenir au moins 6 caractères.";
+  if (msg.includes("Unable to validate email") || msg.includes("invalid")) return "Adresse email invalide.";
+  if (msg.includes("Email not confirmed")) return "Confirme d'abord ton adresse email (vérifie ta boîte mail).";
+  return msg || "Une erreur est survenue. Réessaie.";
+}
+
+function initAuthModalEvents(){
+  const closeBtn = document.getElementById("authCloseBtn");
+  const overlay = document.getElementById("authModalOverlay");
+  const form = document.getElementById("authForm");
+  const googleBtn = document.getElementById("authGoogleBtn");
+  const switchBtn = document.getElementById("authSwitchBtn");
+  if (closeBtn) closeBtn.addEventListener("click", closeAuthModal);
+  if (overlay) overlay.addEventListener("click", (e) => { if (e.target === overlay) closeAuthModal(); });
+  if (switchBtn) switchBtn.addEventListener("click", () => setAuthMode(authMode === "signup" ? "login" : "signup"));
+  if (googleBtn) googleBtn.addEventListener("click", async () => {
+    if (!sbClient) return;
+    try{
+      const { error } = await sbClient.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin + window.location.pathname }
+      });
+      if (error) throw error;
+      // La page va rediriger vers Google puis revenir : pas besoin de fermer le modal ici.
+    }catch(e){ showAuthError(authErrorMessage(e)); }
+  });
+  if (form) form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!sbClient) return;
+    const email = document.getElementById("authEmail").value.trim();
+    const password = document.getElementById("authPassword").value;
+    try{
+      if (authMode === "signup"){
+        const { data, error } = await sbClient.auth.signUp({ email, password });
+        if (error) throw error;
+        if (data.user && !data.session){
+          showAuthError("Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.");
+          return;
+        }
+      } else {
+        const { error } = await sbClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+      closeAuthModal();
+    }catch(e){ showAuthError(authErrorMessage(e)); }
+  });
+}
+
+// Écrit en local instantanément (déjà fait par saveProgress) puis pousse vers le
+// cloud après un court délai, pour éviter une écriture à chaque clic.
+function scheduleCloudPush(examId, data){
+  if (!currentUser || !sbClient) return;
+  clearTimeout(cloudSyncTimers[examId]);
+  cloudSyncTimers[examId] = setTimeout(() => {
+    sbClient.from("progress").upsert({
+      user_id: currentUser.id,
+      exam_id: examId,
+      data: data,
+      updated_at: data.updatedAt || Date.now()
+    }).then(({error}) => { if (error) console.warn("cloud push failed", error); });
+  }, 2500);
+}
+
+// À la connexion : fusionne le cloud et le local (garde toujours la version la plus récente
+// de chaque examen, dans les deux sens) pour permettre de changer d'appareil sans rien perdre.
+async function mergeCloudProgress(uid){
+  if (!sbClient) return;
+  try{
+    const { data: rows, error } = await sbClient.from("progress").select("exam_id, data").eq("user_id", uid);
+    if (error) throw error;
+    const cloudMap = {};
+    (rows || []).forEach(r => { cloudMap[r.exam_id] = r.data; });
+
+    Object.keys(cloudMap).forEach(examId => {
+      const cloudData = cloudMap[examId];
+      const localData = loadProgress(examId);
+      if ((cloudData.updatedAt||0) > (localData.updatedAt||0)){
+        try{ localStorage.setItem("prepari:progress:"+examId, JSON.stringify(cloudData)); }catch(e){}
+      }
+    });
+
+    allProgress().forEach(({exam, data}) => {
+      const cloudData = cloudMap[exam.id];
+      if ((data.updatedAt||0) >= ((cloudData && cloudData.updatedAt) || 0)){
+        sbClient.from("progress").upsert({
+          user_id: uid, exam_id: exam.id, data: data, updated_at: data.updatedAt || Date.now()
+        }).then(()=>{});
+      }
+    });
+
+    if (location.hash.replace(/^#\/?/, "").split("/")[0] === "progression") route();
+  }catch(e){ console.warn("cloud merge failed", e); }
 }
 
 // ---------- Router ----------
@@ -242,6 +413,9 @@ let bootStarted = false;
 function boot(){
   if (bootStarted) return;
   bootStarted = true;
+  renderAuthArea();
+  initAuthModalEvents();
+  initSupabase();
   app.innerHTML = `<div class="empty">Chargement…</div>`;
   loadExamsMeta().then(route).catch(() => {
     app.innerHTML = `<div class="empty">Impossible de charger les données de Suprepa. Vérifie ta connexion et recharge la page.</div>`;
