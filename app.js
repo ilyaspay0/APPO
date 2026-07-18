@@ -488,9 +488,10 @@ function setCrumbs(html){ crumbsEl.innerHTML = html; }
 // ---------- Views ----------
 function renderHome(){
   setCrumbs("");
-  const totalQ = EXAMS_DB.reduce((s,e)=>s+e.n,0);
-  const totalExams = EXAMS_DB.length;
-  const totalCorrected = EXAMS_DB.reduce((s,e)=>s+(e.nCorrected||0),0);
+  const browsableExams = EXAMS_DB.filter(e => e.source !== "suprepa");
+  const totalQ = browsableExams.reduce((s,e)=>s+e.n,0);
+  const totalExams = browsableExams.length;
+  const totalCorrected = browsableExams.reduce((s,e)=>s+(e.nCorrected||0),0);
 
   const cards = CONCOURS_ORDER.filter(c => byConcours(c).length).map(c => {
     const exams = byConcours(c);
@@ -932,7 +933,7 @@ async function renderSession(examId, mode){
       return `
       <button class="option ${cls}" data-letter="${o.letter}">
         <span class="letter">${o.letter}</span>
-        <span>${o.text}</span>
+        <span>${escapeHtml(o.text)}</span>
       </button>`;
     }).join("");
 
@@ -943,7 +944,7 @@ async function renderSession(examId, mode){
         correctionHtml = `
           <div class="notice" style="border-color:${isRight? 'var(--green)':'var(--red)'};">
             <b style="color:${isRight? 'var(--green)':'var(--red)'};">${selected ? (isRight ? "Bonne réponse !" : "Ce n'est pas la bonne réponse.") : "Correction"} — réponse correcte : ${correctInfo.correct}</b>
-            ${correctInfo.explanation ? `<div style="margin-top:8px;">${correctInfo.explanation}</div>` : ""}
+            ${correctInfo.explanation ? `<div style="margin-top:8px;">${escapeHtml(correctInfo.explanation)}</div>` : ""}
           </div>`;
       } else {
         correctionHtml = `<div class="notice">Correction non disponible pour cette question.</div>`;
@@ -965,7 +966,7 @@ async function renderSession(examId, mode){
           <span class="qnum" style="margin-bottom:0;">${q.num} · Question ${state.idx+1} sur ${total}${hasCorrection ? " · Corrigée" : ""}</span>
           <button class="flag-btn ${state.flagged[state.idx] ? "on":""}" id="flagBtn" title="Marquer pour révision (touche F)">${state.flagged[state.idx] ? "★ Marquée" : "☆ Marquer"}</button>
         </div>
-        <div class="qtext"><p>${q.text}</p></div>
+        <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
         <div class="options">${optionsHtml}</div>
         ${correctionHtml}
         <div class="kbd-hint">Raccourcis : <kbd>A</kbd><kbd>B</kbd><kbd>C</kbd><kbd>D</kbd> répondre · <kbd>←</kbd><kbd>→</kbd> naviguer · <kbd>F</kbd> marquer</div>
