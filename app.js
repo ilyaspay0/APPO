@@ -180,10 +180,10 @@ const CONCOURS_DESC = {
 };
 
 function byConcours(concours){
-  return EXAMS_DB.filter(e => e.concours === concours);
+  return EXAMS_DB.filter(e => e.concours === concours && e.source !== "suprepa");
 }
 function byMatiere(concours, matiere){
-  return EXAMS_DB.filter(e => e.concours === concours && e.matiere === matiere);
+  return EXAMS_DB.filter(e => e.concours === concours && e.matiere === matiere && e.source !== "suprepa");
 }
 function matieresOf(concours){
   const set = [...new Set(byConcours(concours).map(e => e.matiere))];
