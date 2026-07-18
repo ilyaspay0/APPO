@@ -12,6 +12,44 @@ function escapeHtml(str){
 const prefersReducedMotion = () =>
   window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// ---------- Skeletons de chargement (au lieu d'un simple texte "Chargement…") ----------
+function skeletonQuestionCard(){
+  return `
+    <div class="session-head">
+      <div><div class="skel skel-line w-40" style="height:16px;"></div>
+      <div class="skel skel-line w-70" style="margin-top:8px;"></div></div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" style="width:8%"></div></div>
+    <div class="skel-card">
+      <div class="skel skel-line w-90"></div>
+      <div class="skel skel-line w-70"></div>
+      <div class="skel skel-option"></div>
+      <div class="skel skel-option"></div>
+      <div class="skel skel-option"></div>
+      <div class="skel skel-option"></div>
+    </div>`;
+}
+function skeletonRows(n){
+  return `<div>${Array.from({length:n}, () => `<div class="skel-row"><div class="skel skel-line w-40" style="margin:16px 0 0;"></div></div>`).join("")}</div>`;
+}
+function skeletonHome(){
+  return `
+    <div class="skel-card" style="margin-bottom:16px;">
+      <div class="skel skel-line w-40" style="height:22px;"></div>
+      <div class="skel skel-line w-90"></div>
+      <div class="skel skel-line w-70"></div>
+    </div>
+    ${skeletonRows(4)}`;
+}
+function retryBlock(message, onRetry){
+  const id = "retryBtn" + Math.random().toString(36).slice(2,8);
+  setTimeout(() => {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener("click", onRetry);
+  }, 0);
+  return `<div class="empty">${escapeHtml(message)}<div><button class="btn primary retry-btn" id="${id}" type="button">↻ Réessayer</button></div></div>`;
+}
+
 // ---------- Theme toggle (dark/light) ----------
 (function initTheme(){
   const KEY = "suprepa-theme";
@@ -416,9 +454,12 @@ function boot(){
   renderAuthArea();
   initAuthModalEvents();
   initSupabase();
-  app.innerHTML = `<div class="empty">Chargement…</div>`;
+  app.innerHTML = skeletonHome();
   loadExamsMeta().then(route).catch(() => {
-    app.innerHTML = `<div class="empty">Impossible de charger les données de Suprepa. Vérifie ta connexion et recharge la page.</div>`;
+    app.innerHTML = retryBlock("Impossible de charger les données de Suprepa. Vérifie ta connexion.", () => {
+      bootStarted = false;
+      boot();
+    });
   });
 }
 window.addEventListener("DOMContentLoaded", boot);
@@ -597,7 +638,7 @@ function renderProgression(){
     return;
   }
 
-  app.innerHTML = `<div class="empty">Chargement de ta progression…</div>`;
+  app.innerHTML = `<div class="section-head"><h2>Ma progression</h2></div>` + skeletonRows(Math.min(items.length, 5));
 
   Promise.all(items.map(({exam}) => loadCorrections(exam.id).catch(() => []))).then(correctionsList => {
     let totalFinished = 0;
@@ -826,12 +867,12 @@ async function renderSession(examId, mode){
   if (!exam) return renderHome();
   setCrumbs(`<a href="#/">Accueil</a> / <a href="#/exam/${exam.id}">${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${exam.annee}</a> / ${mode === "examen" ? "Examen" : "Cours"}`);
 
-  app.innerHTML = `<div class="empty">Chargement de l'examen…</div>`;
+  app.innerHTML = skeletonQuestionCard();
   let questions;
   try{
     questions = await loadExamQuestions(examId);
   }catch(e){
-    app.innerHTML = `<div class="empty">Impossible de charger cet examen. Vérifie ta connexion et réessaie.</div>`;
+    app.innerHTML = retryBlock("Impossible de charger cet examen. Vérifie ta connexion.", () => renderSession(examId, mode));
     return;
   }
 
@@ -939,15 +980,22 @@ async function renderSession(examId, mode){
     `;
     renderMath();
 
-    async function selectOption(letter){
+    async function selectOption(letter, btnEl){
       if (state.reviewMode && mode === "examen") return; // read-only review of a timed exam
       state.answers[state.idx] = letter;
       persist();
+      // Retour visuel immédiat : si une correction va être révélée (mode cours),
+      // l'appel réseau peut prendre un instant — on ne laisse jamais l'écran figé sans rien.
+      const willFetchCorrection = mode === "cours";
+      if (willFetchCorrection && btnEl){
+        app.querySelectorAll(".option").forEach(b => b.classList.add("pending"));
+        btnEl.classList.add("selected");
+      }
       await renderQuestion();
     }
 
     app.querySelectorAll(".option").forEach(btn => {
-      btn.addEventListener("click", () => selectOption(btn.dataset.letter));
+      btn.addEventListener("click", () => selectOption(btn.dataset.letter, btn));
     });
     $("#flagBtn").addEventListener("click", async () => {
       if (state.flagged[state.idx]) delete state.flagged[state.idx];
