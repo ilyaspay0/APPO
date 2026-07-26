@@ -12,6 +12,214 @@ function escapeHtml(str){
 const prefersReducedMotion = () =>
   window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// ---------- Interface language (FR/AR) ----------
+// Scope: interface chrome only (buttons, labels, headings, notices). Concours/matière
+// names and the QCM content itself (questions, options, explanations) come from the
+// data layer and are never touched here — they stay exactly as authored.
+// Arabic strings use Modern Standard Arabic. Counts don't implement full Arabic plural
+// rules (singular/dual/plural-3-10/plural-11+) — that's a known simplification, not a bug.
+const I18N = {
+  fr: {
+    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil",
+    search_placeholder:"Chercher un concours, une matière…",
+    theme_to_dark:"Passer en mode sombre", theme_to_light:"Passer en mode clair",
+    lang_to_ar:"Passer l'interface en arabe", lang_to_fr:"Passer l'interface en français",
+    footer_tagline:"Plateforme gratuite de préparation aux concours marocains — QCM corrigés et expliqués, mode cours et mode examen chronométré. Ta progression est sauvegardée localement sur cet appareil.",
+    footer_nav_title:"Navigation", footer_choose_concours:"Choisir un concours", footer_faq:"Questions fréquentes",
+    footer_contact_title:"Contact", footer_contact_text:"Une question, une suggestion, un problème sur un examen ? Écris-nous, on répond rapidement.",
+    footer_copyright:"© 2026 Suprepa — banque de QCM d'entraînement pour les concours marocains",
+    auth_sub:"Synchronise ta progression entre ton téléphone et ton ordinateur.", auth_google:"Continuer avec Google",
+    auth_or:"ou", auth_email:"Email", auth_password:"Mot de passe", auth_login:"Se connecter", auth_signup:"Créer mon compte",
+    auth_no_account:"Pas encore de compte ?", auth_have_account:"Déjà un compte ?",
+    auth_create_account:"Créer un compte", auth_close:"Fermer", auth_signout:"Se déconnecter", auth_connected:"Connecté",
+    auth_connect_title:"Facultatif — connecte-toi pour garder ta progression entre ton téléphone et ton ordinateur",
+    auth_not_configured:"La connexion n'est pas encore configurée sur ce site. Réessaie plus tard.",
+    err_bad_credentials:"Email ou mot de passe incorrect.", err_account_exists:"Un compte existe déjà avec cet email.",
+    err_password_short:"Le mot de passe doit contenir au moins 6 caractères.", err_invalid_email:"Adresse email invalide.",
+    err_confirm_email:"Confirme d'abord ton adresse email (vérifie ta boîte mail).", err_generic:"Une erreur est survenue. Réessaie.",
+    auth_signup_success:"Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.",
+    retry:"↻ Réessayer", err_load_exams:"Impossible de charger les données de Suprepa. Vérifie ta connexion.",
+    err_load_exam:"Impossible de charger cet examen. Vérifie ta connexion.",
+    hero_badge:"Plateforme gratuite · Maroc", hero_title:"Prépare ton <em>concours</em>,<br>question par question.",
+    hero_desc:"Banque de QCM corrigés pour les concours d'accès aux grandes écoles et facultés marocaines — mode cours pour apprendre, mode examen chronométré pour t'entraîner en conditions réelles.",
+    hero_cta_start:"Commencer maintenant →", hero_cta_progress:"Voir ma progression",
+    cover_candidate:"Candidat(e)", cover_you:"Toi", cover_concours:"Concours", cover_free_choice:"Au choix",
+    cover_duration:"Durée", cover_timed:"Chronométrée", cover_questions:"Questions", cover_available:"disponibles",
+    cover_status:"Statut", cover_ready:"Prêt",
+    stat_questions:"Questions", stat_exams:"Examens", stat_concours:"Concours", stat_corrected:"Corrigées",
+    section_choose_concours:"Choisis ton concours", section_resume:"Reprendre mes révisions", see_all:"Voir tout",
+    section_why:"Pourquoi Suprepa ?",
+    feature_free_title:"100% gratuit", feature_free_desc:"Toute la banque de QCM est accessible librement, sans compte obligatoire et sans frais cachés.",
+    feature_corrections_title:"Corrections détaillées", feature_corrections_desc:"Chaque question corrigée est accompagnée d'une explication claire : la bonne réponse, et pourquoi les autres sont fausses.",
+    feature_modes_title:"Deux modes d'entraînement", feature_modes_desc:"Mode cours pour apprendre à ton rythme, mode examen chronométré pour simuler les conditions réelles du concours.",
+    feature_progress_title:"Progression sauvegardée", feature_progress_desc:"Ton avancement est enregistré automatiquement sur cet appareil : reprends un examen là où tu l'as laissé.",
+    section_how:"Comment ça marche",
+    step1_title:"Choisis ton concours et un examen", step1_desc:"Médecine, ENSA, ENSAM, ENCG ou ISPITS — sélectionne la matière et l'année qui t'intéressent.",
+    step2_title:"Réponds aux QCM", step2_desc:"En mode cours avec correction immédiate, ou en mode examen chronométré pour te mettre en conditions réelles.",
+    step3_title:"Analyse tes résultats", step3_desc:"Consulte ton score, revois tes erreurs et les explications, et suis ta progression au fil des examens.",
+    section_faq:"Questions fréquentes",
+    faq_q1:"Est-ce que Suprepa est vraiment gratuit ?", faq_a1:"Oui. L'accès à l'ensemble des QCM, examens et corrections disponibles sur Suprepa est entièrement gratuit.",
+    faq_q2:"Quels concours sont couverts ?",
+    faq_q3:"Quelle est la différence entre mode cours et mode examen ?", faq_a3:"Le mode cours te permet d'avancer à ton rythme avec correction et explication immédiates après chaque réponse. Le mode examen chronomètre ta session pour simuler les conditions réelles du concours, avec un bilan à la fin.",
+    faq_q4:"Est-ce que toutes les questions sont corrigées ?", faq_a4:"Non, certaines questions n'ont pas encore de correction disponible. Elles restent néanmoins accessibles à l'entraînement pour t'habituer aux énoncés du concours.",
+    faq_q5:"Comment vous contacter ?",
+    progression_title:"Ma progression", progression_empty:'Tu n\'as pas encore commencé d\'examen. <a href="#/">Choisis un concours</a> pour démarrer.',
+    stat_started:"Examens entamés", stat_finished:"Terminés", stat_success_rate:"Taux de réussite (corrigées)",
+    row_finished:"terminé", row_in_progress:"en cours",
+    btn_review:"Revoir", btn_continue:"Continuer", btn_open:"Ouvrir",
+    no_exam_for_concours:"Aucun examen pour ce concours.", back_all_concours:"Tous les concours", empty_no_exam:"Aucun examen.",
+    inedit_title:"Questions inédites", inedit_badge:"Original Suprepa",
+    inedit_desc:"Des QCM entièrement inédits, écrits dans l'esprit des concours marocains — jamais tombés dans une vraie session. Idéal pour tester ta compréhension au-delà des annales déjà connues, avec une correction et une explication systématiques sur chaque question.",
+    inedit_empty:"Aucune question inédite disponible pour le moment.", inedit_no_concours:"Aucune question inédite pour ce concours.",
+    inedit_matiere_hint:"Questions inédites, jamais tombées en concours", inedit_empty_lots:"Aucun lot disponible.",
+    corrige_100:"100% corrigées",
+    mode_cours_tag:"Mode cours", mode_cours_title:"Question par question",
+    mode_cours_desc:"Avance à ton rythme, reviens en arrière, pas de chronomètre. Idéal pour découvrir les notions.",
+    btn_start:"Commencer", mode_examen_tag:"Mode examen", mode_examen_title:"Chronométré",
+    btn_start_timer:"Démarrer le chrono", notice_none_corrected:"Aucune correction disponible pour le moment sur cet examen — tu peux quand même t'entraîner sur les énoncés.",
+    crumb_examen:"Examen", crumb_cours:"Cours", mode_examen_review:"Revue de l'examen", mode_examen_timed:"Mode examen chronométré",
+    mode_cours_label:"Mode cours", corrected_tag:"Corrigée",
+    flag_marked:"★ Marquée", flag_mark:"☆ Marquer", flag_title:"Marquer pour révision (touche F)",
+    kbd_hint:'Raccourcis : <kbd>A</kbd><kbd>B</kbd><kbd>C</kbd><kbd>D</kbd> répondre · <kbd>←</kbd><kbd>→</kbd> naviguer · <kbd>F</kbd> marquer',
+    swipe_hint:"← Glisse pour changer de question →",
+    btn_prev:"Précédente", btn_next:"Suivante →", btn_finish:"Terminer", btn_finish_review:"Terminer la revue",
+    correct_answer_right:"Bonne réponse !", correct_answer_wrong:"Ce n'est pas la bonne réponse.",
+    correction_label:"Correction", no_correction:"Correction non disponible pour cette question.",
+    calculating_score:"Calcul du score…", session_finished:"Session terminée", stat_answered:"Répondues",
+    score_label:"Score (corrigées)", no_correction_available:"Aucune correction dispo",
+    good_score_msg:"Bon score sur les questions corrigées — continue comme ça.",
+    notice_no_correctable:"Aucune question de cet examen n'est corrigée pour le moment.",
+    review_answers_hint:"Revois tes réponses en détail ci-dessous.", flagged_questions:"Questions marquées",
+    btn_review_answers:"Revoir les réponses", btn_other_exams:"Autres examens", search_no_results:"Aucun résultat pour"
+  },
+  ar: {
+    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية",
+    search_placeholder:"ابحث عن مباراة أو مادة…",
+    theme_to_dark:"التبديل إلى الوضع الداكن", theme_to_light:"التبديل إلى الوضع الفاتح",
+    lang_to_ar:"التبديل إلى العربية", lang_to_fr:"التبديل إلى الفرنسية",
+    footer_tagline:"منصة مجانية للتحضير للمباريات المغربية — أسئلة اختيار من متعدد مصححة ومشروحة، وضع المراجعة ووضع الامتحان المحدد بوقت. يُحفظ تقدمك محليًا على هذا الجهاز.",
+    footer_nav_title:"التصفح", footer_choose_concours:"اختر مباراة", footer_faq:"الأسئلة الشائعة",
+    footer_contact_title:"تواصل معنا", footer_contact_text:"سؤال، اقتراح، أو مشكلة في امتحان؟ اكتب لنا، نرد بسرعة.",
+    footer_copyright:"© 2026 Suprepa — بنك أسئلة للتدرب على المباريات المغربية",
+    auth_sub:"زامن تقدمك بين هاتفك وحاسوبك.", auth_google:"الاستمرار باستخدام Google",
+    auth_or:"أو", auth_email:"البريد الإلكتروني", auth_password:"كلمة المرور", auth_login:"تسجيل الدخول", auth_signup:"إنشاء حسابي",
+    auth_no_account:"ليس لديك حساب؟", auth_have_account:"لديك حساب؟",
+    auth_create_account:"إنشاء حساب", auth_close:"إغلاق", auth_signout:"تسجيل الخروج", auth_connected:"متصل",
+    auth_connect_title:"اختياري — سجّل الدخول للاحتفاظ بتقدمك بين هاتفك وحاسوبك",
+    auth_not_configured:"تسجيل الدخول غير مُفعّل بعد على هذا الموقع. حاول مرة أخرى لاحقًا.",
+    err_bad_credentials:"البريد الإلكتروني أو كلمة المرور غير صحيحة.", err_account_exists:"يوجد حساب بالفعل بهذا البريد الإلكتروني.",
+    err_password_short:"يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.", err_invalid_email:"عنوان بريد إلكتروني غير صالح.",
+    err_confirm_email:"أكّد أولاً بريدك الإلكتروني (تحقق من صندوق الوارد).", err_generic:"حدث خطأ. حاول مرة أخرى.",
+    auth_signup_success:"تم إنشاء الحساب! تحقق من بريدك الإلكتروني لتأكيد عنوانك، ثم سجّل الدخول.",
+    retry:"↻ إعادة المحاولة", err_load_exams:"تعذر تحميل بيانات Suprepa. تحقق من اتصالك.",
+    err_load_exam:"تعذر تحميل هذا الامتحان. تحقق من اتصالك.",
+    hero_badge:"منصة مجانية · المغرب", hero_title:"حضّر لـ<em>مباراتك</em>،<br>سؤالاً بعد سؤال.",
+    hero_desc:"بنك أسئلة اختيار من متعدد مصححة لمباريات الالتحاق بالمدارس العليا والكليات المغربية — وضع المراجعة للتعلم، ووضع الامتحان المحدد بوقت للتدرب في ظروف حقيقية.",
+    hero_cta_start:"ابدأ الآن ←", hero_cta_progress:"شاهد تقدمي",
+    cover_candidate:"المترشح(ة)", cover_you:"أنت", cover_concours:"المباراة", cover_free_choice:"حسب الاختيار",
+    cover_duration:"المدة", cover_timed:"محددة بوقت", cover_questions:"الأسئلة", cover_available:"متوفر",
+    cover_status:"الحالة", cover_ready:"جاهز",
+    stat_questions:"الأسئلة", stat_exams:"الامتحانات", stat_concours:"المباريات", stat_corrected:"المصححة",
+    section_choose_concours:"اختر مباراتك", section_resume:"استئناف مراجعتي", see_all:"عرض الكل",
+    section_why:"لماذا Suprepa؟",
+    feature_free_title:"مجاني 100%", feature_free_desc:"بنك الأسئلة بأكمله متاح مجانًا، بدون حساب إلزامي وبدون أي رسوم خفية.",
+    feature_corrections_title:"تصحيحات مفصّلة", feature_corrections_desc:"كل سؤال مصحح مرفق بشرح واضح: الجواب الصحيح، وسبب خطأ الأجوبة الأخرى.",
+    feature_modes_title:"وضعان للتدرب", feature_modes_desc:"وضع المراجعة للتعلم بالسرعة التي تناسبك، ووضع الامتحان المحدد بوقت لمحاكاة ظروف المباراة الحقيقية.",
+    feature_progress_title:"تقدم محفوظ", feature_progress_desc:"يُسجَّل تقدمك تلقائيًا على هذا الجهاز: استأنف أي امتحان من حيث توقفت.",
+    section_how:"كيف يعمل الموقع",
+    step1_title:"اختر مباراتك وامتحانًا", step1_desc:"الطب، ENSA، ENSAM، ENCG أو ISPITS — اختر المادة والسنة التي تهمك.",
+    step2_title:"أجب عن الأسئلة", step2_desc:"في وضع المراجعة مع تصحيح فوري، أو في وضع الامتحان المحدد بوقت لتضع نفسك في ظروف حقيقية.",
+    step3_title:"حلّل نتائجك", step3_desc:"تفقد نتيجتك، راجع أخطاءك والشروحات، وتتبع تقدمك عبر الامتحانات.",
+    section_faq:"الأسئلة الشائعة",
+    faq_q1:"هل Suprepa مجاني بالفعل؟", faq_a1:"نعم. الوصول إلى جميع الأسئلة والامتحانات والتصحيحات المتوفرة على Suprepa مجاني بالكامل.",
+    faq_q2:"ما هي المباريات المتوفرة؟",
+    faq_q3:"ما الفرق بين وضع المراجعة ووضع الامتحان؟", faq_a3:"يتيح لك وضع المراجعة التقدم بالسرعة التي تناسبك مع تصحيح وشرح فوريين بعد كل إجابة. أما وضع الامتحان فيحدد وقت جلستك لمحاكاة ظروف المباراة الحقيقية، مع تقرير نهائي.",
+    faq_q4:"هل جميع الأسئلة مصححة؟", faq_a4:"لا، بعض الأسئلة ليس لها تصحيح متوفر بعد. تبقى مع ذلك متاحة للتدرب لتعتاد على صيغة أسئلة المباراة.",
+    faq_q5:"كيف تتواصل معنا؟",
+    progression_title:"تقدمي", progression_empty:'لم تبدأ أي امتحان بعد. <a href="#/">اختر مباراة</a> للبدء.',
+    stat_started:"امتحانات بدأتها", stat_finished:"المنتهية", stat_success_rate:"معدل النجاح (المصححة)",
+    row_finished:"منتهٍ", row_in_progress:"قيد التقدم",
+    btn_review:"مراجعة", btn_continue:"استمرار", btn_open:"فتح",
+    no_exam_for_concours:"لا يوجد امتحان لهذه المباراة.", back_all_concours:"جميع المباريات", empty_no_exam:"لا يوجد امتحان.",
+    inedit_title:"أسئلة حصرية", inedit_badge:"أصلي من Suprepa",
+    inedit_desc:"أسئلة اختيار من متعدد حصرية بالكامل، مكتوبة بروح المباريات المغربية — لم تُطرح مطلقًا في جلسة حقيقية. مثالية لاختبار فهمك بعيدًا عن الامتحانات السابقة المعروفة، مع تصحيح وشرح منهجي لكل سؤال.",
+    inedit_empty:"لا توجد أسئلة حصرية متوفرة حاليًا.", inedit_no_concours:"لا توجد أسئلة حصرية لهذه المباراة.",
+    inedit_matiere_hint:"أسئلة حصرية، لم تُطرح مطلقًا في المباراة", inedit_empty_lots:"لا توجد مجموعة متوفرة.",
+    corrige_100:"مصححة 100%",
+    mode_cours_tag:"وضع المراجعة", mode_cours_title:"سؤال بسؤال",
+    mode_cours_desc:"تقدم بالسرعة التي تناسبك، والرجوع للخلف ممكن، بدون توقيت. مثالي لاكتشاف المفاهيم.",
+    btn_start:"ابدأ", mode_examen_tag:"وضع الامتحان", mode_examen_title:"محدد بوقت",
+    btn_start_timer:"بدء العد", notice_none_corrected:"لا يوجد تصحيح متوفر حاليًا لهذا الامتحان — يمكنك مع ذلك التدرب على الأسئلة.",
+    crumb_examen:"امتحان", crumb_cours:"مراجعة", mode_examen_review:"مراجعة الامتحان", mode_examen_timed:"وضع الامتحان المحدد بوقت",
+    mode_cours_label:"وضع المراجعة", corrected_tag:"مصححة",
+    flag_marked:"★ محددة", flag_mark:"☆ تحديد", flag_title:"وضع علامة للمراجعة (زر F)",
+    kbd_hint:'اختصارات: <kbd>A</kbd><kbd>B</kbd><kbd>C</kbd><kbd>D</kbd> للإجابة · <kbd>←</kbd><kbd>→</kbd> للتنقل · <kbd>F</kbd> للتحديد',
+    swipe_hint:"→ مرر لتغيير السؤال ←",
+    btn_prev:"السابق", btn_next:"التالي ←", btn_finish:"إنهاء", btn_finish_review:"إنهاء المراجعة",
+    correct_answer_right:"إجابة صحيحة!", correct_answer_wrong:"هذه ليست الإجابة الصحيحة.",
+    correction_label:"التصحيح", no_correction:"التصحيح غير متوفر لهذا السؤال.",
+    calculating_score:"جارٍ حساب النتيجة…", session_finished:"انتهت الجلسة", stat_answered:"تمت الإجابة عنها",
+    score_label:"النتيجة (المصححة)", no_correction_available:"لا يوجد تصحيح",
+    good_score_msg:"نتيجة جيدة في الأسئلة المصححة — واصل على هذا المنوال.",
+    notice_no_correctable:"لا يوجد سؤال مصحح في هذا الامتحان حاليًا.",
+    review_answers_hint:"راجع إجاباتك بالتفصيل أدناه.", flagged_questions:"الأسئلة المحددة",
+    btn_review_answers:"مراجعة الإجابات", btn_other_exams:"امتحانات أخرى", search_no_results:"لا نتائج لـ"
+  }
+};
+
+const LANG_KEY = "suprepa-lang";
+let currentLang = "fr";
+try{ currentLang = localStorage.getItem(LANG_KEY) === "ar" ? "ar" : "fr"; }catch(e){}
+
+function t(key){
+  const dict = I18N[currentLang] || I18N.fr;
+  return (key in dict) ? dict[key] : (I18N.fr[key] || key);
+}
+// Direction-aware back arrow: in RTL, "back" points visually right (toward where
+// reading started), not left — a plain "&larr;" would look backwards to an Arabic reader.
+function backArrow(){ return currentLang === "ar" ? "→" : "←"; }
+
+// Small pluralization helpers for the handful of recurring "N noun(s)" patterns.
+// Arabic side intentionally skips full plural-rule agreement (dual/3-10/11+) — see note above.
+function nExamens(n){ return currentLang === "ar" ? `${n} امتحان` : `${n} examen${n>1?"s":""}`; }
+function nQuestions(n){ return currentLang === "ar" ? `${n} سؤال` : `${n} question${n>1?"s":""}`; }
+function nMatieres(n){ return currentLang === "ar" ? `${n} مادة` : `${n} matière${n>1?"s":""}`; }
+function nLots(n){ return currentLang === "ar" ? `${n} مجموعة` : `${n} lot${n>1?"s":""}`; }
+
+function applyStaticTranslations(){
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.innerHTML = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  const toggle = document.getElementById("langToggle");
+  if (toggle){
+    toggle.querySelector('[data-lang-tag="fr"]').classList.toggle("on", currentLang === "fr");
+    toggle.querySelector('[data-lang-tag="ar"]').classList.toggle("on", currentLang === "ar");
+    toggle.setAttribute("aria-label", currentLang === "ar" ? t("lang_to_fr") : t("lang_to_ar"));
+  }
+}
+
+function applyLangToDocument(){
+  const root = document.documentElement;
+  root.setAttribute("lang", currentLang);
+  root.setAttribute("dir", currentLang === "ar" ? "rtl" : "ltr");
+}
+
+function setLang(next){
+  if (next === currentLang) return;
+  currentLang = next;
+  try{ localStorage.setItem(LANG_KEY, next); }catch(e){}
+  applyLangToDocument();
+  applyStaticTranslations();
+  renderAuthArea();
+  if (document.getElementById("authModalOverlay")) setAuthMode(authMode);
+  route(); // re-render the current view's dynamic content in the new language
+}
+
+(function initLangToggle(){
+  applyLangToDocument();
+  const btn = document.getElementById("langToggle");
+  if (btn) btn.addEventListener("click", () => setLang(currentLang === "ar" ? "fr" : "ar"));
+})();
+
 // ---------- Skeletons de chargement (au lieu d'un simple texte "Chargement…") ----------
 function skeletonQuestionCard(){
   return `
@@ -47,7 +255,7 @@ function retryBlock(message, onRetry){
     const btn = document.getElementById(id);
     if (btn) btn.addEventListener("click", onRetry);
   }, 0);
-  return `<div class="empty">${escapeHtml(message)}<div><button class="btn primary retry-btn" id="${id}" type="button">↻ Réessayer</button></div></div>`;
+  return `<div class="empty">${escapeHtml(message)}<div><button class="btn primary retry-btn" id="${id}" type="button">${t("retry")}</button></div></div>`;
 }
 
 // ---------- Theme toggle (dark/light) ----------
@@ -61,7 +269,7 @@ function retryBlock(message, onRetry){
   function paintButton(theme){
     if (!btn) return;
     btn.innerHTML = theme === "dark" ? ICON_SUN : ICON_MOON;
-    btn.setAttribute("aria-label", theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre");
+    btn.setAttribute("aria-label", theme === "dark" ? t("theme_to_light") : t("theme_to_dark"));
   }
   paintButton(root.getAttribute("data-theme") || "light");
 
@@ -299,12 +507,12 @@ function renderAuthArea(){
   if (currentUser){
     el.innerHTML = `
       <div class="auth-user">
-        <span class="auth-email">${escapeHtml(currentUser.email || "Connecté")}</span>
-        <button id="authSignOutBtn" type="button">Se déconnecter</button>
+        <span class="auth-email">${escapeHtml(currentUser.email || t("auth_connected"))}</span>
+        <button id="authSignOutBtn" type="button">${t("auth_signout")}</button>
       </div>`;
     document.getElementById("authSignOutBtn").addEventListener("click", () => sbClient && sbClient.auth.signOut());
   } else {
-    el.innerHTML = `<button class="auth-btn" id="authOpenBtn" type="button" title="Facultatif — connecte-toi pour garder ta progression entre ton téléphone et ton ordinateur">Se connecter</button>`;
+    el.innerHTML = `<button class="auth-btn" id="authOpenBtn" type="button" title="${escapeHtml(t("auth_connect_title"))}">${t("auth_login")}</button>`;
     document.getElementById("authOpenBtn").addEventListener("click", openAuthModal);
   }
 }
@@ -312,7 +520,7 @@ function renderAuthArea(){
 let authMode = "login";
 function openAuthModal(){
   if (!sbClient){
-    alert("La connexion n'est pas encore configurée sur ce site. Réessaie plus tard.");
+    alert(t("auth_not_configured"));
     return;
   }
   const overlay = document.getElementById("authModalOverlay");
@@ -326,10 +534,10 @@ function closeAuthModal(){
 }
 function setAuthMode(mode){
   authMode = mode;
-  document.getElementById("authModalTitle").textContent = mode === "signup" ? "Créer un compte" : "Se connecter";
-  document.getElementById("authSubmitBtn").textContent = mode === "signup" ? "Créer mon compte" : "Se connecter";
-  document.getElementById("authSwitchText").textContent = mode === "signup" ? "Déjà un compte ?" : "Pas encore de compte ?";
-  document.getElementById("authSwitchBtn").textContent = mode === "signup" ? "Se connecter" : "Créer un compte";
+  document.getElementById("authModalTitle").textContent = mode === "signup" ? t("auth_create_account") : t("auth_login");
+  document.getElementById("authSubmitBtn").textContent = mode === "signup" ? t("auth_signup") : t("auth_login");
+  document.getElementById("authSwitchText").textContent = mode === "signup" ? t("auth_have_account") : t("auth_no_account");
+  document.getElementById("authSwitchBtn").textContent = mode === "signup" ? t("auth_login") : t("auth_create_account");
 }
 function showAuthError(msg){
   const el = document.getElementById("authError");
@@ -339,12 +547,12 @@ function showAuthError(msg){
 }
 function authErrorMessage(e){
   const msg = (e && e.message) || "";
-  if (msg.includes("Invalid login credentials")) return "Email ou mot de passe incorrect.";
-  if (msg.includes("already registered") || msg.includes("already exists")) return "Un compte existe déjà avec cet email.";
-  if (msg.includes("Password should be at least")) return "Le mot de passe doit contenir au moins 6 caractères.";
-  if (msg.includes("Unable to validate email") || msg.includes("invalid")) return "Adresse email invalide.";
-  if (msg.includes("Email not confirmed")) return "Confirme d'abord ton adresse email (vérifie ta boîte mail).";
-  return msg || "Une erreur est survenue. Réessaie.";
+  if (msg.includes("Invalid login credentials")) return t("err_bad_credentials");
+  if (msg.includes("already registered") || msg.includes("already exists")) return t("err_account_exists");
+  if (msg.includes("Password should be at least")) return t("err_password_short");
+  if (msg.includes("Unable to validate email") || msg.includes("invalid")) return t("err_invalid_email");
+  if (msg.includes("Email not confirmed")) return t("err_confirm_email");
+  return msg || t("err_generic");
 }
 
 function initAuthModalEvents(){
@@ -377,7 +585,7 @@ function initAuthModalEvents(){
         const { data, error } = await sbClient.auth.signUp({ email, password });
         if (error) throw error;
         if (data.user && !data.session){
-          showAuthError("Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.");
+          showAuthError(t("auth_signup_success"));
           return;
         }
       } else {
@@ -442,23 +650,66 @@ function parseHash(){
 }
 
 window.addEventListener("hashchange", () => {
-  route();
+  navigateWithTransition();
   // Only force scroll-to-top for real app routes (#/...), not in-page anchors like #faq or #concours-grid
   if (location.hash.startsWith("#/") || location.hash === ""){
     window.scrollTo(0, 0);
   }
 });
 
+// ---------- Route transitions ----------
+// Stage-rank heuristic: raw URL segment count breaks down here — e.g. "#/exam/ID" (mode
+// picker) and "#/concours/X" (concours page) both have 2 segments but sit at very
+// different points in the actual journey. Rank routes by their real stage instead:
+// browse (concours/inedit list) -> narrow (matière list) -> pick exam (mode picker)
+// -> session. A higher rank = deeper into the journey = "forward".
+function routeRank(parts){
+  if (parts.length === 0) return 0; // home
+  if (parts[0] === "progression") return 1;
+  if (parts[0] === "inedit"){
+    if (parts.length === 1) return 1;
+    if (parts.length === 2) return 2;
+    return 3; // inedit/concours/matière
+  }
+  if (parts[0] === "concours"){
+    return parts.length === 2 ? 1 : 2; // concours -> concours/matière
+  }
+  if (parts[0] === "exam"){
+    return parts.length === 2 ? 3 : 4; // mode picker -> session
+  }
+  return 0;
+}
+let lastRouteRank = null;
+function navigateWithTransition(){
+  const rank = routeRank(parseHash());
+  const direction = lastRouteRank === null ? "same" : rank > lastRouteRank ? "forward" : rank < lastRouteRank ? "back" : "same";
+  lastRouteRank = rank;
+
+  const runUpdate = () => route();
+
+  if (direction !== "same" && document.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+    document.documentElement.classList.remove("nav-forward", "nav-back");
+    document.documentElement.classList.add(direction === "forward" ? "nav-forward" : "nav-back");
+    const transition = document.startViewTransition(runUpdate);
+    transition.finished.finally(() => {
+      document.documentElement.classList.remove("nav-forward", "nav-back");
+    });
+  } else {
+    runUpdate();
+  }
+}
+
 let bootStarted = false;
 function boot(){
   if (bootStarted) return;
   bootStarted = true;
+  applyStaticTranslations();
   renderAuthArea();
   initAuthModalEvents();
   initSupabase();
   app.innerHTML = skeletonHome();
-  loadExamsMeta().then(route).catch(() => {
-    app.innerHTML = retryBlock("Impossible de charger les données de Suprepa. Vérifie ta connexion.", () => {
+  loadExamsMeta().then(() => { route(); lastRouteRank = routeRank(parseHash()); }).catch(() => {
+    app.innerHTML = retryBlock(t("err_load_exams"), () => {
       bootStarted = false;
       boot();
     });
@@ -500,7 +751,7 @@ function renderHome(){
     const q = exams.reduce((s,e)=>s+e.n,0);
     return `
       <a class="card concours-card" href="#/concours/${encodeURIComponent(c)}">
-        <span class="eyebrow">${matieresOf(c).length} matière${matieresOf(c).length>1?"s":""}</span>
+        <span class="eyebrow">${nMatieres(matieresOf(c).length)}</span>
         <h3>${c}</h3>
         <div class="meta">${CONCOURS_DESC[c]||""}</div>
         <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
@@ -512,7 +763,7 @@ function renderHome(){
     .sort((a,b) => (b.data.updatedAt||0) - (a.data.updatedAt||0))
     .slice(0,3);
   const resumeHtml = resume.length ? `
-    <div class="section-head"><h2>Reprendre mes révisions</h2><a class="hint" href="#/progression">Voir tout</a></div>
+    <div class="section-head"><h2>${t("section_resume")}</h2><a class="hint" href="#/progression">${t("see_all")}</a></div>
     <div class="grid">
       ${resume.map(({exam, data}) => {
         const answered = Object.keys(data.answers||{}).length;
@@ -520,7 +771,7 @@ function renderHome(){
         <a class="card" href="#/exam/${exam.id}/${data.mode||'cours'}">
           <span class="eyebrow">${escapeHtml(exam.concours)} · ${exam.annee}</span>
           <h3>${escapeHtml(exam.matiere)}</h3>
-          <div class="meta">${answered} / ${exam.n} questions traitées</div>
+          <div class="meta">${answered} / ${exam.n} ${currentLang === "ar" ? "سؤال تم إنجازه" : "questions traitées"}</div>
         </a>`;
       }).join("")}
     </div>` : "";
@@ -528,59 +779,60 @@ function renderHome(){
   const nConcours = CONCOURS_ORDER.filter(c=>byConcours(c).length).length;
 
   const featuresHtml = `
-    <div class="section-head"><h2>Pourquoi Suprepa ?</h2></div>
+    <div class="section-head"><h2>${t("section_why")}</h2></div>
     <div class="features-grid">
       <div class="feature-card">
         <span class="fnum"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5M12 17h.01"/></svg></span>
-        <h3>100% gratuit</h3>
-        <p>Toute la banque de QCM est accessible librement, sans compte obligatoire et sans frais cachés.</p>
+        <h3>${t("feature_free_title")}</h3>
+        <p>${t("feature_free_desc")}</p>
       </div>
       <div class="feature-card">
         <span class="fnum"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg></span>
-        <h3>Corrections détaillées</h3>
-        <p>Chaque question corrigée est accompagnée d'une explication claire : la bonne réponse, et pourquoi les autres sont fausses.</p>
+        <h3>${t("feature_corrections_title")}</h3>
+        <p>${t("feature_corrections_desc")}</p>
       </div>
       <div class="feature-card">
         <span class="fnum"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
-        <h3>Deux modes d'entraînement</h3>
-        <p>Mode cours pour apprendre à ton rythme, mode examen chronométré pour simuler les conditions réelles du concours.</p>
+        <h3>${t("feature_modes_title")}</h3>
+        <p>${t("feature_modes_desc")}</p>
       </div>
       <div class="feature-card">
         <span class="fnum"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg></span>
-        <h3>Progression sauvegardée</h3>
-        <p>Ton avancement est enregistré automatiquement sur cet appareil : reprends un examen là où tu l'as laissé.</p>
+        <h3>${t("feature_progress_title")}</h3>
+        <p>${t("feature_progress_desc")}</p>
       </div>
     </div>`;
 
   const stepsHtml = `
-    <div class="section-head"><h2>Comment ça marche</h2></div>
+    <div class="section-head"><h2>${t("section_how")}</h2></div>
     <div class="steps-row">
       <div class="step-item">
         <div class="step-num">01</div>
-        <h3>Choisis ton concours et un examen</h3>
-        <p>Médecine, ENSA, ENSAM, ENCG ou ISPITS — sélectionne la matière et l'année qui t'intéressent.</p>
+        <h3>${t("step1_title")}</h3>
+        <p>${t("step1_desc")}</p>
       </div>
       <div class="step-item">
         <div class="step-num">02</div>
-        <h3>Réponds aux QCM</h3>
-        <p>En mode cours avec correction immédiate, ou en mode examen chronométré pour te mettre en conditions réelles.</p>
+        <h3>${t("step2_title")}</h3>
+        <p>${t("step2_desc")}</p>
       </div>
       <div class="step-item">
         <div class="step-num">03</div>
-        <h3>Analyse tes résultats</h3>
-        <p>Consulte ton score, revois tes erreurs et les explications, et suis ta progression au fil des examens.</p>
+        <h3>${t("step3_title")}</h3>
+        <p>${t("step3_desc")}</p>
       </div>
     </div>`;
 
+  const concoursListStr = CONCOURS_ORDER.filter(c=>byConcours(c).length).join(", ");
   const faqData = [
-    ["Est-ce que Suprepa est vraiment gratuit ?", "Oui. L'accès à l'ensemble des QCM, examens et corrections disponibles sur Suprepa est entièrement gratuit."],
-    ["Quels concours sont couverts ?", `Suprepa couvre actuellement ${CONCOURS_ORDER.filter(c=>byConcours(c).length).join(", ")}. D'autres concours pourront être ajoutés progressivement.`],
-    ["Quelle est la différence entre mode cours et mode examen ?", "Le mode cours te permet d'avancer à ton rythme avec correction et explication immédiates après chaque réponse. Le mode examen chronomètre ta session pour simuler les conditions réelles du concours, avec un bilan à la fin."],
-    ["Est-ce que toutes les questions sont corrigées ?", "Non, certaines questions n'ont pas encore de correction disponible. Elles restent néanmoins accessibles à l'entraînement pour t'habituer aux énoncés du concours."],
-    ["Comment vous contacter ?", `Pour toute question, suggestion ou signalement d'erreur, écris-nous à <a href="mailto:ilyaspay0@gmail.com">ilyaspay0@gmail.com</a>.`]
+    [t("faq_q1"), t("faq_a1")],
+    [t("faq_q2"), currentLang === "ar" ? `يغطي Suprepa حاليًا ${concoursListStr}. قد تُضاف مباريات أخرى تدريجيًا.` : `Suprepa couvre actuellement ${concoursListStr}. D'autres concours pourront être ajoutés progressivement.`],
+    [t("faq_q3"), t("faq_a3")],
+    [t("faq_q4"), t("faq_a4")],
+    [t("faq_q5"), currentLang === "ar" ? `لأي سؤال أو اقتراح أو للإشارة إلى خطأ، اكتب لنا على <a href="mailto:ilyaspay0@gmail.com">ilyaspay0@gmail.com</a>.` : `Pour toute question, suggestion ou signalement d'erreur, écris-nous à <a href="mailto:ilyaspay0@gmail.com">ilyaspay0@gmail.com</a>.`]
   ];
   const faqHtml = `
-    <div class="section-head" id="faq"><h2>Questions fréquentes</h2></div>
+    <div class="section-head" id="faq"><h2>${t("section_faq")}</h2></div>
     <div class="faq-list">
       ${faqData.map(([q,a]) => `
         <details class="faq-item">
@@ -593,32 +845,32 @@ function renderHome(){
     <div class="home-page">
     <section class="hero">
       <div class="hero-copy">
-        <span class="hero-badge"><span class="dot"></span>Plateforme gratuite · Maroc</span>
-        <h1>Prépare ton <em>concours</em>,<br>question par question.</h1>
-        <p>Banque de QCM corrigés pour les concours d'accès aux grandes écoles et facultés marocaines — mode cours pour apprendre, mode examen chronométré pour t'entraîner en conditions réelles.</p>
+        <span class="hero-badge"><span class="dot"></span>${t("hero_badge")}</span>
+        <h1>${t("hero_title")}</h1>
+        <p>${t("hero_desc")}</p>
         <div class="cta-row">
-          <a class="btn primary lg" href="#concours-grid">Commencer maintenant →</a>
-          <a class="btn lg" href="#/progression">Voir ma progression</a>
+          <a class="btn primary lg" href="#concours-grid">${t("hero_cta_start")}</a>
+          <a class="btn lg" href="#/progression">${t("hero_cta_progress")}</a>
         </div>
       </div>
       <div class="exam-cover">
-        <div class="row"><span>Candidat(e)</span><span>Toi</span></div>
-        <div class="row"><span>Concours</span><span>Au choix</span></div>
-        <div class="row"><span>Durée</span><span>Chronométrée</span></div>
-        <div class="row"><span>Questions</span><span>${totalQ.toLocaleString("fr-FR")} disponibles</span></div>
-        <div class="row"><span>Statut</span><span>Prêt</span></div>
+        <div class="row"><span>${t("cover_candidate")}</span><span>${t("cover_you")}</span></div>
+        <div class="row"><span>${t("cover_concours")}</span><span>${t("cover_free_choice")}</span></div>
+        <div class="row"><span>${t("cover_duration")}</span><span>${t("cover_timed")}</span></div>
+        <div class="row"><span>${t("cover_questions")}</span><span>${totalQ.toLocaleString("fr-FR")} ${t("cover_available")}</span></div>
+        <div class="row"><span>${t("cover_status")}</span><span>${t("cover_ready")}</span></div>
         <div class="stamp"><img src="images/logo-96.png" alt="Suprepa"></div>
       </div>
     </section>
 
     <div class="stat-strip">
-      <div class="stat-cell"><b>${totalQ.toLocaleString("fr-FR")}</b><span>Questions</span></div>
-      <div class="stat-cell"><b>${totalExams}</b><span>Examens</span></div>
-      <div class="stat-cell"><b>${nConcours}</b><span>Concours</span></div>
-      <div class="stat-cell"><b>${totalCorrected.toLocaleString("fr-FR")}</b><span>Corrigées</span></div>
+      <div class="stat-cell"><b>${totalQ.toLocaleString("fr-FR")}</b><span>${t("stat_questions")}</span></div>
+      <div class="stat-cell"><b>${totalExams}</b><span>${t("stat_exams")}</span></div>
+      <div class="stat-cell"><b>${nConcours}</b><span>${t("stat_concours")}</span></div>
+      <div class="stat-cell"><b>${totalCorrected.toLocaleString("fr-FR")}</b><span>${t("stat_corrected")}</span></div>
     </div>
 
-    <div class="section-head" id="concours-grid"><h2>Choisis ton concours</h2><span class="hint">${totalExams} examens indexés</span></div>
+    <div class="section-head" id="concours-grid"><h2>${t("section_choose_concours")}</h2><span class="hint">${nExamens(totalExams)} ${currentLang === "ar" ? "مُفهرس" : "indexés"}</span></div>
     <div class="grid">${cards}</div>
     ${resumeHtml}
     ${featuresHtml}
@@ -630,18 +882,18 @@ function renderHome(){
 }
 
 function renderProgression(){
-  setCrumbs(`<a href="#/">Accueil</a> / Ma progression`);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("progression_title")}`);
   const items = allProgress();
 
   if (!items.length){
     app.innerHTML = `
-      <div class="section-head"><h2>Ma progression</h2></div>
-      <div class="empty">Tu n'as pas encore commencé d'examen. <a href="#/">Choisis un concours</a> pour démarrer.</div>
+      <div class="section-head"><h2>${t("progression_title")}</h2></div>
+      <div class="empty">${t("progression_empty")}</div>
     `;
     return;
   }
 
-  app.innerHTML = `<div class="section-head"><h2>Ma progression</h2></div>` + skeletonRows(Math.min(items.length, 5));
+  app.innerHTML = `<div class="section-head"><h2>${t("progression_title")}</h2></div>` + skeletonRows(Math.min(items.length, 5));
 
   Promise.all(items.map(({exam}) => loadCorrections(exam.id).catch(() => []))).then(correctionsList => {
     let totalFinished = 0;
@@ -665,27 +917,27 @@ function renderProgression(){
       <div class="exam-row" style="flex-direction:column; align-items:stretch; gap:10px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
           <div class="left">
-            ${exam.source === "suprepa" ? `<span class="badge-original">Original</span>` : `<span class="year">${exam.annee}</span>`}
+            ${exam.source === "suprepa" ? `<span class="badge-original">${t("inedit_badge")}</span>` : `<span class="year">${exam.annee}</span>`}
             <div>
               <div style="font-weight:600;">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)}</div>
-              <div class="n">${answered} / ${exam.n} répondues${data.finishedAt ? " · terminé" : " · en cours"}${nCorrectable ? ` · score ${nCorrect}/${nCorrectable}` : ""}</div>
+              <div class="n">${answered} / ${exam.n} ${currentLang === "ar" ? "تمت الإجابة عنها" : "répondues"}${data.finishedAt ? ` · ${t("row_finished")}` : ` · ${t("row_in_progress")}`}${nCorrectable ? ` · ${currentLang === "ar" ? "النتيجة" : "score"} ${nCorrect}/${nCorrectable}` : ""}</div>
             </div>
           </div>
           <div class="actions">
-            <a class="btn" href="#/exam/${exam.id}/${data.mode||'cours'}">${data.finishedAt ? "Revoir" : "Continuer"}</a>
+            <a class="btn" href="#/exam/${exam.id}/${data.mode||'cours'}">${data.finishedAt ? t("btn_review") : t("btn_continue")}</a>
           </div>
         </div>
-        <div class="progress-track" style="margin-bottom:0;" role="progressbar" aria-valuenow="${answered}" aria-valuemin="0" aria-valuemax="${exam.n}" aria-label="${answered} questions répondues sur ${exam.n}">
+        <div class="progress-track" style="margin-bottom:0;" role="progressbar" aria-valuenow="${answered}" aria-valuemin="0" aria-valuemax="${exam.n}" aria-label="${answered}/${exam.n}">
           <div class="progress-fill" style="width:${Math.round(answered/exam.n*100)}%; ${data.finishedAt ? 'background:var(--green);' : ''}"></div>
         </div>
       </div>`).join("");
 
     app.innerHTML = `
-      <div class="section-head"><h2>Ma progression</h2><span class="hint">${items.length} examen${items.length>1?"s":""} entamé${items.length>1?"s":""}</span></div>
+      <div class="section-head"><h2>${t("progression_title")}</h2><span class="hint">${nExamens(items.length)}</span></div>
       <div class="summary-grid" style="margin-bottom:32px;">
-        <div class="summary-stat"><b>${items.length}</b><span>Examens entamés</span></div>
-        <div class="summary-stat"><b>${totalFinished}</b><span>Terminés</span></div>
-        <div class="summary-stat"><b>${totalCorrectable ? Math.round(100*totalCorrect/totalCorrectable)+"%" : "—"}</b><span>Taux de réussite (corrigées)</span></div>
+        <div class="summary-stat"><b>${items.length}</b><span>${t("stat_started")}</span></div>
+        <div class="summary-stat"><b>${totalFinished}</b><span>${t("stat_finished")}</span></div>
+        <div class="summary-stat"><b>${totalCorrectable ? Math.round(100*totalCorrect/totalCorrectable)+"%" : "—"}</b><span>${t("stat_success_rate")}</span></div>
       </div>
       ${rowsHtml}
     `;
@@ -694,10 +946,10 @@ function renderProgression(){
 }
 
 function renderConcours(concours){
-  setCrumbs(`<a href="#/">Accueil</a> / ${escapeHtml(concours)}`);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${escapeHtml(concours)}`);
   const matieres = matieresOf(concours);
   if (!matieres.length){
-    app.innerHTML = `<a class="backlink" href="#/">&larr; Accueil</a><div class="empty">Aucun examen pour ce concours.</div>`;
+    app.innerHTML = `<a class="backlink" href="#/">${backArrow()} ${t("nav_home")}</a><div class="empty">${t("no_exam_for_concours")}</div>`;
     return;
   }
   const cards = matieres.map(m => {
@@ -708,48 +960,51 @@ function renderConcours(concours){
       <a class="card" href="#/concours/${encodeURIComponent(concours)}/${encodeURIComponent(m)}">
         <span class="eyebrow">${years[0]}–${years[years.length-1]}</span>
         <h3>${escapeHtml(m)}</h3>
-        <div class="meta">${exams.length} examen${exams.length>1?"s":""} · ${q} questions</div>
+        <div class="meta">${nExamens(exams.length)} · ${nQuestions(q)}</div>
       </a>`;
   }).join("");
 
   app.innerHTML = `
-    <a class="backlink" href="#/">&larr; Tous les concours</a>
+    <a class="backlink" href="#/">${backArrow()} ${t("back_all_concours")}</a>
     <div class="section-head"><h2>${escapeHtml(concours)}</h2><span class="hint">${CONCOURS_DESC[concours]||""}</span></div>
     <div class="grid">${cards}</div>
   `;
 }
 
 function renderMatiere(concours, matiere){
-  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/concours/${encodeURIComponent(concours)}">${escapeHtml(concours)}</a> / ${escapeHtml(matiere)}`);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/concours/${encodeURIComponent(concours)}">${escapeHtml(concours)}</a> / ${escapeHtml(matiere)}`);
   const exams = byMatiere(concours, matiere).sort((a,b)=> b.annee.localeCompare(a.annee));
 
   const rows = exams.map(e => {
     const progress = loadProgress(e.id);
     const answered = Object.keys(progress.answers||{}).length;
     return `
-      <div class="exam-row">
-        <div class="left">
-          <span class="year">${e.annee}</span>
-          <div>
-            <div style="font-weight:600;">${escapeHtml(e.matiere)} ${e.annee}</div>
-            <div class="n">${e.n} questions${answered ? ` · ${answered} traitées` : ""}</div>
+      <div class="exam-row" style="flex-direction:column; align-items:stretch; gap:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+          <div class="left">
+            <span class="year">${e.annee}</span>
+            <div>
+              <div style="font-weight:600; view-transition-name:exam-title-${e.id};">${escapeHtml(e.matiere)} ${e.annee}</div>
+              <div class="n">${nQuestions(e.n)}${answered ? ` · ${answered} ${currentLang === "ar" ? "تم إنجازها" : "traitées"}` : ""}</div>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="btn" href="#/exam/${e.id}">${t("btn_open")}</a>
           </div>
         </div>
-        <div class="actions">
-          <a class="btn" href="#/exam/${e.id}">Ouvrir</a>
-        </div>
+        ${answered ? `<div class="progress-track" style="margin-bottom:0;" role="progressbar" aria-valuenow="${answered}" aria-valuemin="0" aria-valuemax="${e.n}" aria-label="${answered}/${e.n}"><div class="progress-fill" style="width:${Math.round(answered/e.n*100)}%;"></div></div>` : ""}
       </div>`;
   }).join("");
 
   app.innerHTML = `
-    <a class="backlink" href="#/concours/${encodeURIComponent(concours)}">&larr; ${escapeHtml(concours)}</a>
-    <div class="section-head"><h2>${escapeHtml(matiere)}</h2><span class="hint">${exams.length} examens</span></div>
-    ${rows || '<div class="empty">Aucun examen.</div>'}
+    <a class="backlink" href="#/concours/${encodeURIComponent(concours)}">${backArrow()} ${escapeHtml(concours)}</a>
+    <div class="section-head"><h2>${escapeHtml(matiere)}</h2><span class="hint">${nExamens(exams.length)}</span></div>
+    ${rows || `<div class="empty">${t("empty_no_exam")}</div>`}
   `;
 }
 
 function renderInedit(){
-  setCrumbs(`<a href="#/">Accueil</a> / Questions inédites`);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("inedit_title")}`);
   const concoursList = ineditConcoursList();
 
   const cards = concoursList.map(c => {
@@ -757,7 +1012,7 @@ function renderInedit(){
     const q = exams.reduce((s,e)=>s+e.n,0);
     return `
       <a class="card concours-card" href="#/inedit/${encodeURIComponent(c)}">
-        <span class="eyebrow">${ineditMatieresOf(c).length} matière${ineditMatieresOf(c).length>1?"s":""}</span>
+        <span class="eyebrow">${nMatieres(ineditMatieresOf(c).length)}</span>
         <h3>${c}</h3>
         <div class="meta">${CONCOURS_DESC[c]||""}</div>
         <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
@@ -766,19 +1021,19 @@ function renderInedit(){
 
   app.innerHTML = `
     <div class="inedit-hero">
-      <span class="badge-original">Original Suprepa</span>
-      <div class="section-head" style="margin:12px 0 0;"><h2 style="margin:0;">Questions inédites</h2></div>
-      <p>Des QCM entièrement inédits, écrits dans l'esprit des concours marocains — <b>jamais tombés</b> dans une vraie session. Idéal pour tester ta compréhension au-delà des annales déjà connues, avec une correction et une explication systématiques sur chaque question.</p>
+      <span class="badge-original">${t("inedit_badge")}</span>
+      <div class="section-head" style="margin:12px 0 0;"><h2 style="margin:0;">${t("inedit_title")}</h2></div>
+      <p>${t("inedit_desc")}</p>
     </div>
-    ${concoursList.length ? `<div class="grid">${cards}</div>` : '<div class="empty">Aucune question inédite disponible pour le moment.</div>'}
+    ${concoursList.length ? `<div class="grid">${cards}</div>` : `<div class="empty">${t("inedit_empty")}</div>`}
   `;
 }
 
 function renderIneditConcours(concours){
-  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/inedit">Questions inédites</a> / ${escapeHtml(concours)}`);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/inedit">${t("inedit_title")}</a> / ${escapeHtml(concours)}`);
   const matieres = ineditMatieresOf(concours);
   if (!matieres.length){
-    app.innerHTML = `<a class="backlink" href="#/inedit">&larr; Questions inédites</a><div class="empty">Aucune question inédite pour ce concours.</div>`;
+    app.innerHTML = `<a class="backlink" href="#/inedit">${backArrow()} ${t("inedit_title")}</a><div class="empty">${t("inedit_no_concours")}</div>`;
     return;
   }
   const cards = matieres.map(m => {
@@ -786,45 +1041,48 @@ function renderIneditConcours(concours){
     const q = exams.reduce((s,e)=>s+e.n,0);
     return `
       <a class="card" href="#/inedit/${encodeURIComponent(concours)}/${encodeURIComponent(m)}">
-        <span class="badge-original" style="margin-bottom:8px;">Original Suprepa</span>
+        <span class="badge-original" style="margin-bottom:8px;">${t("inedit_badge")}</span>
         <h3>${escapeHtml(m)}</h3>
-        <div class="meta">${exams.length} lot${exams.length>1?"s":""} · ${q} questions</div>
+        <div class="meta">${nLots(exams.length)} · ${nQuestions(q)}</div>
       </a>`;
   }).join("");
 
   app.innerHTML = `
-    <a class="backlink" href="#/inedit">&larr; Questions inédites</a>
-    <div class="section-head"><h2>${escapeHtml(concours)}</h2><span class="hint">Questions inédites, jamais tombées en concours</span></div>
+    <a class="backlink" href="#/inedit">${backArrow()} ${t("inedit_title")}</a>
+    <div class="section-head"><h2>${escapeHtml(concours)}</h2><span class="hint">${t("inedit_matiere_hint")}</span></div>
     <div class="grid">${cards}</div>
   `;
 }
 
 function renderIneditMatiere(concours, matiere){
-  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/inedit">Questions inédites</a> / <a href="#/inedit/${encodeURIComponent(concours)}">${escapeHtml(concours)}</a> / ${escapeHtml(matiere)}`);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/inedit">${t("inedit_title")}</a> / <a href="#/inedit/${encodeURIComponent(concours)}">${escapeHtml(concours)}</a> / ${escapeHtml(matiere)}`);
   const exams = byIneditMatiere(concours, matiere);
 
   const rows = exams.map(e => {
     const progress = loadProgress(e.id);
     const answered = Object.keys(progress.answers||{}).length;
     return `
-      <div class="exam-row">
-        <div class="left">
-          <span class="badge-original">Original Suprepa</span>
-          <div>
-            <div style="font-weight:600;">${escapeHtml(e.matiere)} — ${e.annee}</div>
-            <div class="n">${e.n} questions, 100% corrigées${answered ? ` · ${answered} traitées` : ""}</div>
+      <div class="exam-row" style="flex-direction:column; align-items:stretch; gap:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+          <div class="left">
+            <span class="badge-original">${t("inedit_badge")}</span>
+            <div>
+              <div style="font-weight:600; view-transition-name:exam-title-${e.id};">${escapeHtml(e.matiere)} — ${e.annee}</div>
+              <div class="n">${nQuestions(e.n)}, ${t("corrige_100")}${answered ? ` · ${answered} ${currentLang === "ar" ? "تم إنجازها" : "traitées"}` : ""}</div>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="btn" href="#/exam/${e.id}">${t("btn_open")}</a>
           </div>
         </div>
-        <div class="actions">
-          <a class="btn" href="#/exam/${e.id}">Ouvrir</a>
-        </div>
+        ${answered ? `<div class="progress-track" style="margin-bottom:0;" role="progressbar" aria-valuenow="${answered}" aria-valuemin="0" aria-valuemax="${e.n}" aria-label="${answered}/${e.n}"><div class="progress-fill" style="width:${Math.round(answered/e.n*100)}%;"></div></div>` : ""}
       </div>`;
   }).join("");
 
   app.innerHTML = `
-    <a class="backlink" href="#/inedit/${encodeURIComponent(concours)}">&larr; ${escapeHtml(concours)}</a>
-    <div class="section-head"><h2>${escapeHtml(matiere)}</h2><span class="hint">${exams.length} lot${exams.length>1?"s":""} inédit${exams.length>1?"s":""}</span></div>
-    ${rows || '<div class="empty">Aucun lot disponible.</div>'}
+    <a class="backlink" href="#/inedit/${encodeURIComponent(concours)}">${backArrow()} ${escapeHtml(concours)}</a>
+    <div class="section-head"><h2>${escapeHtml(matiere)}</h2><span class="hint">${nLots(exams.length)}</span></div>
+    ${rows || `<div class="empty">${t("inedit_empty_lots")}</div>`}
   `;
 }
 
@@ -836,35 +1094,37 @@ function renderModePicker(examId){
     ? `#/inedit/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}`
     : `#/concours/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}`;
   setCrumbs(isOriginal
-    ? `<a href="#/">Accueil</a> / <a href="#/inedit">Questions inédites</a> / <a href="#/inedit/${encodeURIComponent(exam.concours)}">${escapeHtml(exam.concours)}</a> / ${escapeHtml(exam.matiere)}`
-    : `<a href="#/">Accueil</a> / <a href="#/concours/${encodeURIComponent(exam.concours)}">${escapeHtml(exam.concours)}</a> / ${escapeHtml(exam.matiere)} ${exam.annee}`);
+    ? `<a href="#/">${t("nav_home")}</a> / <a href="#/inedit">${t("inedit_title")}</a> / <a href="#/inedit/${encodeURIComponent(exam.concours)}">${escapeHtml(exam.concours)}</a> / ${escapeHtml(exam.matiere)}`
+    : `<a href="#/">${t("nav_home")}</a> / <a href="#/concours/${encodeURIComponent(exam.concours)}">${escapeHtml(exam.concours)}</a> / ${escapeHtml(exam.matiere)} ${exam.annee}`);
 
   const nCorrected = exam.nCorrected || 0;
   const noticeHtml = nCorrected === exam.n
-    ? `<div class="notice">Les ${exam.n} questions de cet examen sont corrigées avec explication.</div>`
+    ? `<div class="notice">${currentLang === "ar" ? `جميع أسئلة هذا الامتحان (${exam.n}) مصححة مع شرح.` : `Les ${exam.n} questions de cet examen sont corrigées avec explication.`}</div>`
     : nCorrected > 0
-      ? `<div class="notice">${nCorrected} question${nCorrected>1?"s":""} sur ${exam.n} sont corrigées avec explication ; les autres restent disponibles en entraînement sans validation automatique.</div>`
-      : `<div class="notice">Aucune correction disponible pour le moment sur cet examen — tu peux quand même t'entraîner sur les énoncés.</div>`;
+      ? `<div class="notice">${currentLang === "ar" ? `${nCorrected} من أصل ${exam.n} سؤالاً مصححة مع شرح؛ باقي الأسئلة تبقى متاحة للتدرب بدون تصحيح آلي.` : `${nCorrected} question${nCorrected>1?"s":""} sur ${exam.n} sont corrigées avec explication ; les autres restent disponibles en entraînement sans validation automatique.`}</div>`
+      : `<div class="notice">${t("notice_none_corrected")}</div>`;
 
   app.innerHTML = `
-    <a class="backlink" href="${backHref}">&larr; ${escapeHtml(exam.matiere)}</a>
+    <a class="backlink" href="${backHref}">${backArrow()} ${escapeHtml(exam.matiere)}</a>
     <div class="section-head">
-      <h2>${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${isOriginal ? "" : exam.annee}</h2>
-      <span class="hint">${isOriginal ? `<span class="badge-original">Original Suprepa</span>` : `${exam.n} questions`}</span>
+      <h2 style="view-transition-name:exam-title-${exam.id};">${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${isOriginal ? "" : exam.annee}</h2>
+      <span class="hint">${isOriginal ? `<span class="badge-original">${t("inedit_badge")}</span>` : nQuestions(exam.n)}</span>
     </div>
     ${noticeHtml}
     <div class="mode-grid">
       <a class="mode-card" href="#/exam/${exam.id}/cours">
-        <span class="icon">Mode cours</span>
-        <h3>Question par question</h3>
-        <p>Avance à ton rythme, reviens en arrière, pas de chronomètre. Idéal pour découvrir les notions.</p>
-        <span class="btn primary">Commencer</span>
+        <svg class="mode-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span class="eyebrow">${t("mode_cours_tag")}</span>
+        <h3>${t("mode_cours_title")}</h3>
+        <p>${t("mode_cours_desc")}</p>
+        <span class="btn primary">${t("btn_start")}</span>
       </a>
       <a class="mode-card" href="#/exam/${exam.id}/examen">
-        <span class="icon">Mode examen</span>
-        <h3>Chronométré</h3>
-        <p>${exam.n} questions, ${Math.round(exam.n*1.5)} minutes. Simule les conditions réelles du concours.</p>
-        <span class="btn gold">Démarrer le chrono</span>
+        <svg class="mode-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>
+        <span class="eyebrow">${t("mode_examen_tag")}</span>
+        <h3>${t("mode_examen_title")}</h3>
+        <p>${currentLang === "ar" ? `${exam.n} سؤال، ${Math.round(exam.n*1.5)} دقيقة. يحاكي ظروف المباراة الحقيقية.` : `${exam.n} questions, ${Math.round(exam.n*1.5)} minutes. Simule les conditions réelles du concours.`}</p>
+        <span class="btn gold">${t("btn_start_timer")}</span>
       </a>
     </div>
   `;
@@ -873,14 +1133,14 @@ function renderModePicker(examId){
 async function renderSession(examId, mode){
   const exam = examById(examId);
   if (!exam) return renderHome();
-  setCrumbs(`<a href="#/">Accueil</a> / <a href="#/exam/${exam.id}">${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${exam.annee}</a> / ${mode === "examen" ? "Examen" : "Cours"}`);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/exam/${exam.id}">${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${exam.annee}</a> / ${mode === "examen" ? t("crumb_examen") : t("crumb_cours")}`);
 
   app.innerHTML = skeletonQuestionCard();
   let questions;
   try{
     questions = await loadExamQuestions(examId);
   }catch(e){
-    app.innerHTML = retryBlock("Impossible de charger cet examen. Vérifie ta connexion.", () => renderSession(examId, mode));
+    app.innerHTML = retryBlock(t("err_load_exam"), () => renderSession(examId, mode));
     return;
   }
 
@@ -950,19 +1210,19 @@ async function renderSession(examId, mode){
         const isRight = selected === correctInfo.correct;
         correctionHtml = `
           <div class="notice" style="border-color:${isRight? 'var(--green)':'var(--red)'};">
-            <b style="color:${isRight? 'var(--green)':'var(--red)'};">${selected ? (isRight ? "Bonne réponse !" : "Ce n'est pas la bonne réponse.") : "Correction"} — réponse correcte : ${correctInfo.correct}</b>
+            <b style="color:${isRight? 'var(--green)':'var(--red)'};">${selected ? (isRight ? t("correct_answer_right") : t("correct_answer_wrong")) : t("correction_label")} — ${currentLang === "ar" ? `الإجابة الصحيحة: ${correctInfo.correct}` : `réponse correcte : ${correctInfo.correct}`}</b>
             ${correctInfo.explanation ? `<div style="margin-top:8px;">${escapeHtml(correctInfo.explanation)}</div>` : ""}
           </div>`;
       } else {
-        correctionHtml = `<div class="notice">Correction non disponible pour cette question.</div>`;
+        correctionHtml = `<div class="notice">${t("no_correction")}</div>`;
       }
     }
 
     app.innerHTML = `
       <div class="session-head">
         <div>
-          <div class="title">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.source === "suprepa" ? `<span class="badge-original" style="margin-left:6px;">Original Suprepa</span>` : exam.annee}</div>
-          <div class="sub">${mode === "examen" ? (state.reviewMode ? "Revue de l'examen" : "Mode examen chronométré") : "Mode cours"} — question ${state.idx+1} / ${total}</div>
+          <div class="title">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.source === "suprepa" ? `<span class="badge-original" style="margin-left:6px;">${t("inedit_badge")}</span>` : exam.annee}</div>
+          <div class="sub">${mode === "examen" ? (state.reviewMode ? t("mode_examen_review") : t("mode_examen_timed")) : t("mode_cours_label")} — ${state.idx+1} / ${total}</div>
         </div>
         ${mode === "examen" && !state.reviewMode ? `<div class="timer" id="timer">${fmtTime(state.secondsLeft)}</div>` : ""}
       </div>
@@ -970,20 +1230,20 @@ async function renderSession(examId, mode){
 
       <div class="question-card">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-          <span class="qnum" style="margin-bottom:0;">${q.num} · Question ${state.idx+1} sur ${total}${hasCorrection ? " · Corrigée" : ""}</span>
-          <button class="flag-btn ${state.flagged[state.idx] ? "on":""}" id="flagBtn" title="Marquer pour révision (touche F)">${state.flagged[state.idx] ? "★ Marquée" : "☆ Marquer"}</button>
+          <span class="qnum" style="margin-bottom:0;">${q.num} · ${currentLang === "ar" ? `${state.idx+1} من ${total}` : `Question ${state.idx+1} sur ${total}`}${hasCorrection ? ` · ${t("corrected_tag")}` : ""}</span>
+          <button class="flag-btn ${state.flagged[state.idx] ? "on":""}" id="flagBtn" title="${t("flag_title")}">${state.flagged[state.idx] ? t("flag_marked") : t("flag_mark")}</button>
         </div>
         <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
         <div class="options">${optionsHtml}</div>
         ${correctionHtml}
-        <div class="kbd-hint">Raccourcis : <kbd>A</kbd><kbd>B</kbd><kbd>C</kbd><kbd>D</kbd> répondre · <kbd>←</kbd><kbd>→</kbd> naviguer · <kbd>F</kbd> marquer</div>
-        <div class="swipe-hint">← Glisse pour changer de question →</div>
+        <div class="kbd-hint">${t("kbd_hint")}</div>
+        <div class="swipe-hint">${t("swipe_hint")}</div>
       </div>
 
       <div class="session-nav" style="margin-top:20px;">
-        <button class="btn" id="prevBtn" ${state.idx===0 ? "disabled":""}>&larr; Précédente</button>
-        <span class="mid">${Object.keys(state.answers).length} / ${total} répondues</span>
-        <button class="btn primary" id="nextBtn">${state.idx === total-1 ? (state.reviewMode ? "Terminer la revue" : "Terminer") : "Suivante →"}</button>
+        <button class="btn" id="prevBtn" ${state.idx===0 ? "disabled":""}>${backArrow()} ${t("btn_prev")}</button>
+        <span class="mid">${Object.keys(state.answers).length} / ${total} ${currentLang === "ar" ? "تمت الإجابة عنها" : "répondues"}</span>
+        <button class="btn primary" id="nextBtn">${state.idx === total-1 ? (state.reviewMode ? t("btn_finish_review") : t("btn_finish")) : t("btn_next")}</button>
       </div>
     `;
     renderMath();
@@ -1029,6 +1289,23 @@ async function renderSession(examId, mode){
     const total = questions.length;
     const answered = Object.keys(state.answers).length;
     const skipped = total - answered;
+
+    // Immediate feedback: the corrections fetch below is a real network round-trip,
+    // and this is the single most anticipation-charged moment in the whole app (did I
+    // pass?). Never leave that silent, even on a slow connection.
+    app.innerHTML = `
+      <div class="session-head">
+        <div>
+          <div class="title">${t("calculating_score")}</div>
+          <div class="sub">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)}</div>
+        </div>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-stat"><b>${total}</b><span>${t("stat_questions")}</span></div>
+        <div class="summary-stat"><b>${answered}</b><span>${t("stat_answered")}</span></div>
+        <div class="summary-stat skel-stat"><b>···</b><span>${t("score_label")}</span></div>
+      </div>`;
+
     const corrections = await ensureCorrections();
 
     const correctableIdx = [];
@@ -1042,34 +1319,43 @@ async function renderSession(examId, mode){
       else if (given) nWrong++;
     });
 
+    const scorePct = correctableIdx.length ? nCorrect / correctableIdx.length : null;
     const scoreBlock = correctableIdx.length
-      ? `<div class="summary-stat"><b>${nCorrect} / ${correctableIdx.length}</b><span>Score (corrigées)</span></div>`
-      : `<div class="summary-stat"><b>—</b><span>Aucune correction dispo</span></div>`;
+      ? `<div class="summary-stat${scorePct >= 0.6 ? ' summary-stat--good' : ''}"><b>${nCorrect} / ${correctableIdx.length}</b><span>${t("score_label")}</span></div>`
+      : `<div class="summary-stat"><b>—</b><span>${t("no_correction_available")}</span></div>`;
+    const encouragementHtml = scorePct !== null && scorePct >= 0.6
+      ? `<div class="notice notice--good">${t("good_score_msg")}</div>`
+      : "";
 
     const flaggedIdx = Object.keys(state.flagged || {}).map(Number).sort((a,b)=>a-b);
     const flaggedHtml = flaggedIdx.length ? `
-      <div class="section-head" style="margin-top:32px;"><h2 style="font-size:18px;">Questions marquées</h2><span class="hint">${flaggedIdx.length}</span></div>
+      <div class="section-head" style="margin-top:32px;"><h2 style="font-size:18px;">${t("flagged_questions")}</h2><span class="hint">${flaggedIdx.length}</span></div>
       <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(90px,1fr));">
         ${flaggedIdx.map(i => `<a class="btn ghost" style="text-align:center;" href="#/exam/${exam.id}/${mode}" data-goto="${i}">${questions[i].num}</a>`).join("")}
       </div>` : "";
 
+    const correctableNotice = correctableIdx.length
+      ? (currentLang === "ar" ? `كان لدى ${correctableIdx.length} من أصل ${total} سؤالاً تصحيح متوفر.` : `${correctableIdx.length} question${correctableIdx.length>1?"s":""} sur ${total} avaient une correction disponible.`)
+      : t("notice_no_correctable");
+
     app.innerHTML = `
       <div class="session-head">
         <div>
-          <div class="title">Session terminée</div>
-          <div class="sub">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.source === "suprepa" ? `<span class="badge-original" style="margin-left:6px;">Original Suprepa</span>` : exam.annee}</div>
+          <div class="title">${t("session_finished")}</div>
+          <div class="sub">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)} ${exam.source === "suprepa" ? `<span class="badge-original" style="margin-left:6px;">${t("inedit_badge")}</span>` : exam.annee}</div>
         </div>
       </div>
       <div class="summary-grid">
-        <div class="summary-stat"><b>${total}</b><span>Questions</span></div>
-        <div class="summary-stat"><b>${answered}</b><span>Répondues</span></div>
+        <div class="summary-stat"><b>${total}</b><span>${t("stat_questions")}</span></div>
+        <div class="summary-stat"><b>${answered}</b><span>${t("stat_answered")}</span></div>
         ${scoreBlock}
       </div>
-      <div class="notice">${correctableIdx.length ? `${correctableIdx.length} question${correctableIdx.length>1?"s":""} sur ${total} avaient une correction disponible.` : "Aucune question de cet examen n'est corrigée pour le moment."} Revois tes réponses en détail ci-dessous.</div>
+      ${encouragementHtml}
+      <div class="notice">${correctableNotice} ${t("review_answers_hint")}</div>
       ${flaggedHtml}
       <div class="session-nav" style="margin-top:24px;">
-        <a class="btn" href="#/exam/${exam.id}/${mode}">&larr; Revoir les réponses</a>
-        <a class="btn primary" href="${exam.source === "suprepa" ? `#/inedit/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}` : `#/concours/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}`}">Autres examens</a>
+        <a class="btn" href="#/exam/${exam.id}/${mode}">${backArrow()} ${t("btn_review_answers")}</a>
+        <a class="btn primary" href="${exam.source === "suprepa" ? `#/inedit/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}` : `#/concours/${encodeURIComponent(exam.concours)}/${encodeURIComponent(exam.matiere)}`}">${t("btn_other_exams")}</a>
       </div>
     `;
     animateCounters();
@@ -1150,14 +1436,14 @@ boot();
 
   function render(list, q){
     if (!list.length){
-      results.innerHTML = `<div class="search-empty">Aucun résultat pour « ${escapeHtml(q)} »</div>`;
+      results.innerHTML = `<div class="search-empty">${t("search_no_results")} « ${escapeHtml(q)} »</div>`;
       results.classList.add("open");
       return;
     }
     results.innerHTML = list.map(e => `
       <a href="#/exam/${e.id}">
         <div>${escapeHtml(e.concours)} · ${escapeHtml(e.matiere)} ${e.annee}</div>
-        <div class="sr-meta">${e.n} questions${e.nCorrected ? ` · ${e.nCorrected} corrigées` : ""}</div>
+        <div class="sr-meta">${e.n} ${currentLang === "ar" ? "سؤال" : "questions"}${e.nCorrected ? ` · ${e.nCorrected} ${currentLang === "ar" ? "مصححة" : "corrigées"}` : ""}</div>
       </a>`).join("");
     results.classList.add("open");
   }
