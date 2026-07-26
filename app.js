@@ -531,22 +531,22 @@ function renderHome(){
     <div class="section-head"><h2>Pourquoi Suprepa ?</h2></div>
     <div class="features-grid">
       <div class="feature-card">
-        <span class="fnum">01</span>
+        <span class="fnum"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5M12 17h.01"/></svg></span>
         <h3>100% gratuit</h3>
         <p>Toute la banque de QCM est accessible librement, sans compte obligatoire et sans frais cachés.</p>
       </div>
       <div class="feature-card">
-        <span class="fnum">02</span>
+        <span class="fnum"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg></span>
         <h3>Corrections détaillées</h3>
         <p>Chaque question corrigée est accompagnée d'une explication claire : la bonne réponse, et pourquoi les autres sont fausses.</p>
       </div>
       <div class="feature-card">
-        <span class="fnum">03</span>
+        <span class="fnum"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
         <h3>Deux modes d'entraînement</h3>
         <p>Mode cours pour apprendre à ton rythme, mode examen chronométré pour simuler les conditions réelles du concours.</p>
       </div>
       <div class="feature-card">
-        <span class="fnum">04</span>
+        <span class="fnum"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg></span>
         <h3>Progression sauvegardée</h3>
         <p>Ton avancement est enregistré automatiquement sur cet appareil : reprends un examen là où tu l'as laissé.</p>
       </div>
@@ -662,16 +662,21 @@ function renderProgression(){
     const totalCorrectable = rows.reduce((s,r)=>s+r.nCorrectable,0);
 
     const rowsHtml = rows.map(({exam, data, answered, nCorrect, nCorrectable}) => `
-      <div class="exam-row">
-        <div class="left">
-          ${exam.source === "suprepa" ? `<span class="badge-original">Original</span>` : `<span class="year">${exam.annee}</span>`}
-          <div>
-            <div style="font-weight:600;">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)}</div>
-            <div class="n">${answered} / ${exam.n} répondues${data.finishedAt ? " · terminé" : " · en cours"}${nCorrectable ? ` · score ${nCorrect}/${nCorrectable}` : ""}</div>
+      <div class="exam-row" style="flex-direction:column; align-items:stretch; gap:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+          <div class="left">
+            ${exam.source === "suprepa" ? `<span class="badge-original">Original</span>` : `<span class="year">${exam.annee}</span>`}
+            <div>
+              <div style="font-weight:600;">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)}</div>
+              <div class="n">${answered} / ${exam.n} répondues${data.finishedAt ? " · terminé" : " · en cours"}${nCorrectable ? ` · score ${nCorrect}/${nCorrectable}` : ""}</div>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="btn" href="#/exam/${exam.id}/${data.mode||'cours'}">${data.finishedAt ? "Revoir" : "Continuer"}</a>
           </div>
         </div>
-        <div class="actions">
-          <a class="btn" href="#/exam/${exam.id}/${data.mode||'cours'}">${data.finishedAt ? "Revoir" : "Continuer"}</a>
+        <div class="progress-track" style="margin-bottom:0;" role="progressbar" aria-valuenow="${answered}" aria-valuemin="0" aria-valuemax="${exam.n}" aria-label="${answered} questions répondues sur ${exam.n}">
+          <div class="progress-fill" style="width:${Math.round(answered/exam.n*100)}%; ${data.finishedAt ? 'background:var(--green);' : ''}"></div>
         </div>
       </div>`).join("");
 

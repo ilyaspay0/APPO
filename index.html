@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Suprepa — QCM des concours marocains</title>
+<title>Suprepa | Plateforme de préparation aux concours au Maroc</title>
 <meta name="google-site-verification" content="Sr_bZlhxIWEhP-Rby8kyjT2LC6e_h9nq5QP8zo-mvoI" />
-<meta name="description" content="Plateforme nationale de préparation aux concours — Médecine, ENSA, ENSAM, ENCG et ISPITS au Maroc."/>
+<meta name="description" content="Préparez les concours marocains grâce à des milliers de QCM corrigés et expliqués. ENSA, ENSAM, Médecine, Pharmacie, ISPITS, FST, ENCG, ENA, INPT et bien d'autres."/>
 <link rel="canonical" href="https://suprepa.com/"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="author" content="Suprepa"/>
-<meta name="keywords" content="concours Maroc, QCM concours, préparation Médecine Maroc, ENSA, ENSAM, ENCG, ISPITS, entrainement concours"/>
+<meta name="keywords" content="suprepa, concours maroc, concours marocains, QCM, QCM concours, ENSA, ENSAM, Médecine, Pharmacie, ISPITS, FST, ENCG, ENA, INPT, EMI, EHTP, ENSEM, ENSA Khouribga, ENSA Agadir, ENSA Marrakech, concours médecine, concours pharmacie, préparation concours, annales concours, examens corrigés, QCM corrigés"/>
 
 <!-- Open Graph -->
 <meta property="og:type" content="website"/>
 <meta property="og:site_name" content="Suprepa"/>
-<meta property="og:title" content="Suprepa — QCM des concours marocains"/>
-<meta property="og:description" content="Plateforme nationale de préparation aux concours — Médecine, ENSA, ENSAM, ENCG et ISPITS au Maroc."/>
+<meta property="og:title" content="Suprepa | Plateforme de préparation aux concours au Maroc"/>
+<meta property="og:description" content="Des milliers de QCM corrigés et expliqués pour réussir vos concours."/>
 <meta property="og:url" content="https://suprepa.com/"/>
 <meta property="og:image" content="https://suprepa.com/images/og-image.png"/>
 <meta property="og:image:width" content="1200"/>
@@ -24,8 +24,8 @@
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image"/>
-<meta name="twitter:title" content="Suprepa — QCM des concours marocains"/>
-<meta name="twitter:description" content="Plateforme nationale de préparation aux concours — Médecine, ENSA, ENSAM, ENCG et ISPITS au Maroc."/>
+<meta name="twitter:title" content="Suprepa | Plateforme de préparation aux concours au Maroc"/>
+<meta name="twitter:description" content="Des milliers de QCM corrigés et expliqués pour réussir vos concours."/>
 <meta name="twitter:image" content="https://suprepa.com/images/og-image.png"/>
 
 <link rel="icon" type="image/png" href="images/logo-64.png">
@@ -39,7 +39,7 @@
   "alternateName": "Suprepa — Plateforme Nationale de Préparation aux Concours",
   "url": "https://suprepa.com/",
   "logo": "https://suprepa.com/images/logo-180.png",
-  "description": "Plateforme nationale de préparation aux concours — Médecine, ENSA, ENSAM, ENCG et ISPITS au Maroc.",
+  "description": "Préparez les concours marocains grâce à des milliers de QCM corrigés et expliqués. ENSA, ENSAM, Médecine, Pharmacie, ISPITS, FST, ENCG, ENA, INPT et bien d'autres.",
   "areaServed": "MA",
   "sameAs": []
 }
@@ -68,44 +68,75 @@
 </script>
 <style>
   :root{
-    --ink:#0F2A4A;
-    --ink-soft:#4C6480;
-    --paper:#F3F7FC;
-    --paper-raised:#FFFFFF;
-    --line:#D3E1EF;
-    --gold:#2E7BD6;
-    --gold-deep:#1D5CA8;
-    --brand-blue:#1660D1;
-    --brand-blue-deep:#0F4CAE;
-    --green:#2E7D5B;
-    --red:#B3432D;
+    /* ===== 1. Primitives (raw values, never used directly in components) ===== */
+    --p-ink-900:#0F2A4A;
+    --p-ink-500:#4C6480;
+    --p-slate-50:#F3F7FC;
+    --p-white:#FFFFFF;
+    --p-line-200:#D3E1EF;
+    --p-sky-500:#2E7BD6;
+    --p-sky-600:#1D5CA8;
+    --p-blue-600:#1660D1;
+    --p-blue-700:#0F4CAE;
+    --p-green-600:#2E7D5B;
+    --p-red-600:#B3432D;
+    --p-amber-tint:#FBF4E4;
+    --p-green-tint:#EAF6EF;
+    --p-red-tint:#FBEEEA;
+    --p-blue-tint:#EAF2FC;
+
+    /* ===== 2. Semantic tokens (purpose aliases — components read these) ===== */
+    --ink: var(--p-ink-900);
+    --ink-soft: var(--p-ink-500);
+    --paper: var(--p-slate-50);
+    --paper-raised: var(--p-white);
+    --line: var(--p-line-200);
+    --gold: var(--p-sky-500);
+    --gold-deep: var(--p-sky-600);
+    --brand-blue: var(--p-blue-600);
+    --brand-blue-deep: var(--p-blue-700);
+    --green: var(--p-green-600);
+    --red: var(--p-red-600);
     --radius:10px;
     --shadow: 0 1px 2px rgba(15,42,74,.06), 0 8px 24px rgba(15,42,74,.05);
     --font-display:'Fraunces', serif;
     --font-body:'Inter', sans-serif;
     --font-mono:'JetBrains Mono', monospace;
-    --bg-selected:#FBF4E4;
-    --bg-correct:#EAF6EF;
-    --bg-incorrect:#FBEEEA;
-    --bg-accent:#EAF2FC;
+    --bg-selected: var(--p-amber-tint);
+    --bg-correct: var(--p-green-tint);
+    --bg-incorrect: var(--p-red-tint);
+    --bg-accent: var(--p-blue-tint);
+
+    /* ===== 3. Component tokens (per-component, derived from semantic layer) =====
+       | Property   | Default        | Hover              | Active         | Disabled |
+       |------------|----------------|--------------------|--------------- |----------|
+       | btn.primary| --ink          | --btn-primary-hover| scale(.96)     | 40% opacity |
+       | btn.gold   | --gold         | --gold-deep        | scale(.96)     | 40% opacity | */
+    --btn-primary-bg: var(--ink);
+    --btn-primary-bg-hover:#0d1526;
+    --btn-primary-fg: var(--p-white);
+    --btn-gold-bg: var(--gold);
+    --btn-gold-bg-hover: var(--gold-deep);
+    --btn-radius:7px;
   }
   :root[data-theme="dark"]{
-    --ink:#E8EEF8;
-    --ink-soft:#93A5C2;
-    --paper:#0B1420;
-    --paper-raised:#131E2E;
-    --line:#243350;
-    --gold:#5B9EEA;
-    --gold-deep:#7DB2F0;
-    --brand-blue:#123464;
-    --brand-blue-deep:#0B2447;
-    --green:#4FBF8F;
-    --red:#E08469;
+    --p-ink-900:#E8EEF8;
+    --p-ink-500:#93A5C2;
+    --p-slate-50:#0B1420;
+    --p-white:#131E2E;
+    --p-line-200:#243350;
+    --p-sky-500:#5B9EEA;
+    --p-sky-600:#7DB2F0;
+    --p-blue-600:#123464;
+    --p-blue-700:#0B2447;
+    --p-green-600:#4FBF8F;
+    --p-red-600:#E08469;
     --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.3);
     --bg-selected: rgba(125,178,240,.14);
     --bg-correct: rgba(79,191,143,.14);
     --bg-incorrect: rgba(224,132,105,.14);
     --bg-accent: rgba(91,158,234,.14);
+    --btn-primary-bg-hover:#1c2a42;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -340,8 +371,8 @@
   }
   .btn:hover{ border-color:var(--ink); transform:translateY(-1px); }
   .btn:active{ transform:scale(.96); }
-  .btn.primary{ background:var(--ink); color:#fff; border-color:var(--ink); }
-  .btn.primary:hover{ background:#0d1526; }
+  .btn.primary{ background:var(--btn-primary-bg); color:var(--btn-primary-fg); border-color:var(--btn-primary-bg); }
+  .btn.primary:hover{ background:var(--btn-primary-bg-hover); }
   .btn.gold{ background:var(--gold); color:var(--ink); border-color:var(--gold); }
   .btn.gold:hover{ background:var(--gold-deep); color:#fff; }
   .btn.ghost{ background:transparent; border-color:transparent; color:var(--ink-soft); }
@@ -360,7 +391,8 @@
   .session-head .title{ font-family:var(--font-display); font-size:19px; font-weight:600;}
   .session-head .sub{ font-family:var(--font-mono); font-size:12px; color:#B9C0D6; margin-top:2px;}
   .timer{ font-family:var(--font-mono); font-size:26px; font-weight:700; background:rgba(255,255,255,.08); padding:6px 16px; border-radius:8px; letter-spacing:1px;}
-  .timer.low{ color:#FFB199; }
+  .timer.low{ color:#FFDCCF; background:rgba(255,255,255,.16); animation:timerPulse 1s ease-in-out infinite; }
+  @keyframes timerPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.05); } }
 
   .progress-track{ height:6px; background:var(--line); border-radius:4px; overflow:hidden; margin-bottom:28px;}
   .progress-fill{ height:100%; background:var(--gold); transition:width .25s ease;}
@@ -467,6 +499,7 @@
   .flag-btn{
     font-family:var(--font-mono); font-size:11.5px; font-weight:600; color:var(--ink-soft);
     background:var(--paper); border:1px solid var(--line); border-radius:20px; padding:5px 12px;
+    min-height:44px; display:inline-flex; align-items:center;
   }
   .flag-btn:hover{ border-color:var(--gold-deep); color:var(--gold-deep); }
   .flag-btn.on{ background:var(--bg-selected); border-color:var(--gold-deep); color:var(--gold-deep); }
@@ -509,7 +542,7 @@
   }
   .feature-card .fnum{
     display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:8px;
-    background:var(--bg-accent); color:var(--gold-deep); font-family:var(--font-mono); font-weight:700; font-size:13px; margin-bottom:12px;
+    background:var(--bg-accent); color:var(--gold-deep); margin-bottom:12px;
   }
   .feature-card h3{ font-family:var(--font-display); font-size:17px; margin:0 0 6px; font-weight:600; }
   .feature-card p{ font-size:13.5px; color:var(--ink-soft); margin:0; line-height:1.55; }
