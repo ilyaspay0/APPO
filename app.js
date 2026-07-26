@@ -179,12 +179,31 @@ function t(key){
 // reading started), not left — a plain "&larr;" would look backwards to an Arabic reader.
 function backArrow(){ return currentLang === "ar" ? "→" : "←"; }
 
-// Small pluralization helpers for the handful of recurring "N noun(s)" patterns.
-// Arabic side intentionally skips full plural-rule agreement (dual/3-10/11+) — see note above.
-function nExamens(n){ return currentLang === "ar" ? `${n} امتحان` : `${n} examen${n>1?"s":""}`; }
-function nQuestions(n){ return currentLang === "ar" ? `${n} سؤال` : `${n} question${n>1?"s":""}`; }
-function nMatieres(n){ return currentLang === "ar" ? `${n} مادة` : `${n} matière${n>1?"s":""}`; }
-function nLots(n){ return currentLang === "ar" ? `${n} مجموعة` : `${n} lot${n>1?"s":""}`; }
+// Arabic noun-number agreement — Arabic has 6 plural categories (CLDR): zero, one,
+// two (dual), few (3-10), many (11-99), other (100+). A single fixed noun form next
+// to a variable count is grammatically wrong for most values of n, so this picks the
+// correct form for the actual count instead of hardcoding one.
+function arPlural(n, forms){
+  const m = n % 100;
+  if (n === 0) return forms.zero;
+  if (n === 1) return forms.one;
+  if (n === 2) return forms.two;
+  if (m >= 3 && m <= 10) return forms.few;
+  if (m >= 11 && m <= 99) return forms.many;
+  return forms.other;
+}
+const AR_NOUNS = {
+  exam:     {zero:"امتحان",  one:"امتحان",  two:"امتحانين",  few:"امتحانات", many:"امتحانًا", other:"امتحان"},
+  question: {zero:"سؤال",    one:"سؤال",    two:"سؤالين",    few:"أسئلة",    many:"سؤالاً",   other:"سؤال"},
+  matiere:  {zero:"مادة",    one:"مادة",    two:"مادتين",    few:"مواد",     many:"مادةً",     other:"مادة"},
+  lot:      {zero:"مجموعة",  one:"مجموعة",  two:"مجموعتين",  few:"مجموعات",  many:"مجموعةً",   other:"مجموعة"},
+  minute:   {zero:"دقيقة",   one:"دقيقة",   two:"دقيقتين",   few:"دقائق",    many:"دقيقة",     other:"دقيقة"}
+};
+function nExamens(n){ return currentLang === "ar" ? `${n} ${arPlural(n, AR_NOUNS.exam)}` : `${n} examen${n>1?"s":""}`; }
+function nQuestions(n){ return currentLang === "ar" ? `${n} ${arPlural(n, AR_NOUNS.question)}` : `${n} question${n>1?"s":""}`; }
+function nMatieres(n){ return currentLang === "ar" ? `${n} ${arPlural(n, AR_NOUNS.matiere)}` : `${n} matière${n>1?"s":""}`; }
+function nLots(n){ return currentLang === "ar" ? `${n} ${arPlural(n, AR_NOUNS.lot)}` : `${n} lot${n>1?"s":""}`; }
+function nMinutes(n){ return currentLang === "ar" ? `${n} ${arPlural(n, AR_NOUNS.minute)}` : `${n} minute${n>1?"s":""}`; }
 
 function applyStaticTranslations(){
   document.querySelectorAll("[data-i18n]").forEach(el => { el.innerHTML = t(el.dataset.i18n); });
@@ -771,7 +790,7 @@ function renderHome(){
         <a class="card" href="#/exam/${exam.id}/${data.mode||'cours'}">
           <span class="eyebrow">${escapeHtml(exam.concours)} · ${exam.annee}</span>
           <h3>${escapeHtml(exam.matiere)}</h3>
-          <div class="meta">${answered} / ${exam.n} ${currentLang === "ar" ? "سؤال تم إنجازه" : "questions traitées"}</div>
+          <div class="meta">${answered} / ${nQuestions(exam.n)}${currentLang === "ar" ? " تمت الإجابة عنها" : " traitées"}</div>
         </a>`;
       }).join("")}
     </div>` : "";
@@ -1101,7 +1120,7 @@ function renderModePicker(examId){
   const noticeHtml = nCorrected === exam.n
     ? `<div class="notice">${currentLang === "ar" ? `جميع أسئلة هذا الامتحان (${exam.n}) مصححة مع شرح.` : `Les ${exam.n} questions de cet examen sont corrigées avec explication.`}</div>`
     : nCorrected > 0
-      ? `<div class="notice">${currentLang === "ar" ? `${nCorrected} من أصل ${exam.n} سؤالاً مصححة مع شرح؛ باقي الأسئلة تبقى متاحة للتدرب بدون تصحيح آلي.` : `${nCorrected} question${nCorrected>1?"s":""} sur ${exam.n} sont corrigées avec explication ; les autres restent disponibles en entraînement sans validation automatique.`}</div>`
+      ? `<div class="notice">${currentLang === "ar" ? `${nCorrected} ${arPlural(nCorrected, AR_NOUNS.question)} من أصل ${exam.n} مصححة مع شرح؛ باقي الأسئلة تبقى متاحة للتدرب بدون تصحيح آلي.` : `${nCorrected} question${nCorrected>1?"s":""} sur ${exam.n} sont corrigées avec explication ; les autres restent disponibles en entraînement sans validation automatique.`}</div>`
       : `<div class="notice">${t("notice_none_corrected")}</div>`;
 
   app.innerHTML = `
@@ -1123,7 +1142,7 @@ function renderModePicker(examId){
         <svg class="mode-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>
         <span class="eyebrow">${t("mode_examen_tag")}</span>
         <h3>${t("mode_examen_title")}</h3>
-        <p>${currentLang === "ar" ? `${exam.n} سؤال، ${Math.round(exam.n*1.5)} دقيقة. يحاكي ظروف المباراة الحقيقية.` : `${exam.n} questions, ${Math.round(exam.n*1.5)} minutes. Simule les conditions réelles du concours.`}</p>
+        <p>${currentLang === "ar" ? `${nQuestions(exam.n)}، ${nMinutes(Math.round(exam.n*1.5))}. يحاكي ظروف المباراة الحقيقية.` : `${exam.n} questions, ${Math.round(exam.n*1.5)} minutes. Simule les conditions réelles du concours.`}</p>
         <span class="btn gold">${t("btn_start_timer")}</span>
       </a>
     </div>
@@ -1335,7 +1354,7 @@ async function renderSession(examId, mode){
       </div>` : "";
 
     const correctableNotice = correctableIdx.length
-      ? (currentLang === "ar" ? `كان لدى ${correctableIdx.length} من أصل ${total} سؤالاً تصحيح متوفر.` : `${correctableIdx.length} question${correctableIdx.length>1?"s":""} sur ${total} avaient une correction disponible.`)
+      ? (currentLang === "ar" ? `كان لدى ${correctableIdx.length} ${arPlural(correctableIdx.length, AR_NOUNS.question)} من أصل ${total} تصحيح متوفر.` : `${correctableIdx.length} question${correctableIdx.length>1?"s":""} sur ${total} avaient une correction disponible.`)
       : t("notice_no_correctable");
 
     app.innerHTML = `
@@ -1443,7 +1462,7 @@ boot();
     results.innerHTML = list.map(e => `
       <a href="#/exam/${e.id}">
         <div>${escapeHtml(e.concours)} · ${escapeHtml(e.matiere)} ${e.annee}</div>
-        <div class="sr-meta">${e.n} ${currentLang === "ar" ? "سؤال" : "questions"}${e.nCorrected ? ` · ${e.nCorrected} ${currentLang === "ar" ? "مصححة" : "corrigées"}` : ""}</div>
+        <div class="sr-meta">${nQuestions(e.n)}${e.nCorrected ? ` · ${e.nCorrected} ${currentLang === "ar" ? "مصححة" : "corrigées"}` : ""}</div>
       </a>`).join("");
     results.classList.add("open");
   }
