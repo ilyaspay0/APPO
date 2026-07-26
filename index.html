@@ -234,7 +234,7 @@
   .search-results .sr-meta{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); }
   .search-empty{ padding:14px; font-size:13px; color:var(--ink-soft); text-align:center; }
   .theme-toggle{
-    width:34px; height:34px; border-radius:50%; flex-shrink:0;
+    width:44px; height:44px; border-radius:50%; flex-shrink:0;
     border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.14); color:#fff;
     font-size:15px; display:flex; align-items:center; justify-content:center;
     transition:background-color .15s ease, transform .12s ease;
@@ -242,7 +242,7 @@
   .theme-toggle:hover{ background:rgba(255,255,255,.24); }
   .theme-toggle:active{ transform:scale(.92); }
   .crumbs-bar{ background:rgba(0,0,0,.12); }
-  .crumbs-inner{ max-width:1120px; margin:0 auto; padding:7px 24px; font-family:var(--font-mono); font-size:12px; color:#DCE8FB; min-height:16px; }
+  .crumbs-inner{ max-width:1120px; margin:0 auto; padding:7px 24px; font-family:var(--font-mono); font-size:12px; color:#E4ECFA; min-height:16px; }
   .crumbs-inner a{ color:#DCE8FB; }
   .crumbs-inner a:hover{ color:#fff; }
   .brand-name{ font-family:var(--font-display); font-weight:600; font-size:21px; letter-spacing:.2px; }
@@ -610,7 +610,7 @@
     .exam-row .actions .btn{ width:100%; justify-content:center; padding:11px; }
 
     /* Buttons: comfortable tap targets */
-    .btn{ padding:10px 16px; min-height:40px; }
+    .btn{ padding:10px 16px; min-height:44px; }
     .btn.lg{ width:100%; justify-content:center; }
 
     /* Mode picker */
@@ -688,8 +688,9 @@
     padding:30px 28px; width:100%; max-width:380px; position:relative;
   }
   .auth-close{
-    position:absolute; top:14px; right:14px; background:transparent; border:none;
-    font-size:16px; color:var(--ink-soft); width:28px; height:28px; border-radius:6px;
+    position:absolute; top:10px; right:10px; background:transparent; border:none;
+    font-size:16px; color:var(--ink-soft); width:40px; height:40px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
   }
   .auth-close:hover{ background:var(--paper); color:var(--ink); }
   .auth-modal h3{ font-family:var(--font-display); font-size:22px; margin:0 0 6px; }
@@ -718,7 +719,7 @@
       <a class="nav-link" href="#/inedit">Questions inédites</a>
       <a class="nav-link" href="#/progression">Ma progression</a>
       <div id="authArea"></div>
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Changer de thème" title="Changer de thème">🌙</button>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Changer de thème" title="Changer de thème"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <div class="search-wrap">
         <input class="search-input" id="globalSearch" type="text" placeholder="Chercher un concours, une matière…" autocomplete="off">
         <div class="search-results" id="searchResults"></div>
@@ -754,7 +755,7 @@
         <h4>Contact</h4>
         <p style="margin-bottom:10px;">Une question, une suggestion, un problème sur un examen ? Écris-nous, on répond rapidement.</p>
         <div class="footer-contact-card">
-          <span class="icon">✉</span>
+          <span class="icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
           <a href="mailto:ilyaspay0@gmail.com">ilyaspay0@gmail.com</a>
         </div>
       </div>
