@@ -20,7 +20,7 @@ const prefersReducedMotion = () =>
 // rules (singular/dual/plural-3-10/plural-11+) — that's a known simplification, not a bug.
 const I18N = {
   fr: {
-    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil",
+    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", skip_to_content:"Aller au contenu",
     search_placeholder:"Chercher un concours, une matière…",
     theme_to_dark:"Passer en mode sombre", theme_to_light:"Passer en mode clair",
     lang_to_ar:"Passer l'interface en arabe", lang_to_fr:"Passer l'interface en français",
@@ -66,7 +66,8 @@ const I18N = {
     progression_title:"Ma progression", progression_empty:'Tu n\'as pas encore commencé d\'examen. <a href="#/">Choisis un concours</a> pour démarrer.',
     stat_started:"Examens entamés", stat_finished:"Terminés", stat_success_rate:"Taux de réussite (corrigées)",
     row_finished:"terminé", row_in_progress:"en cours",
-    btn_review:"Revoir", btn_continue:"Continuer", btn_open:"Ouvrir",
+    btn_review:"Revoir", btn_continue:"Continuer", btn_open:"Ouvrir", btn_review_mistakes:"Revoir mes erreurs",
+    mistakes_title:"Mes erreurs", mistakes_empty:"Aucune erreur à revoir pour le moment — soit tu n'as pas encore répondu à des questions corrigées, soit tu les as toutes eues juste !",
     no_exam_for_concours:"Aucun examen pour ce concours.", back_all_concours:"Tous les concours", empty_no_exam:"Aucun examen.",
     inedit_title:"Questions inédites", inedit_badge:"Original Suprepa",
     inedit_desc:"Des QCM entièrement inédits, écrits dans l'esprit des concours marocains — jamais tombés dans une vraie session. Idéal pour tester ta compréhension au-delà des annales déjà connues, avec une correction et une explication systématiques sur chaque question.",
@@ -93,7 +94,7 @@ const I18N = {
     btn_review_answers:"Revoir les réponses", btn_other_exams:"Autres examens", search_no_results:"Aucun résultat pour"
   },
   ar: {
-    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية",
+    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", skip_to_content:"الانتقال إلى المحتوى",
     search_placeholder:"ابحث عن مباراة أو مادة…",
     theme_to_dark:"التبديل إلى الوضع الداكن", theme_to_light:"التبديل إلى الوضع الفاتح",
     lang_to_ar:"التبديل إلى العربية", lang_to_fr:"التبديل إلى الفرنسية",
@@ -139,7 +140,8 @@ const I18N = {
     progression_title:"تقدمي", progression_empty:'لم تبدأ أي امتحان بعد. <a href="#/">اختر مباراة</a> للبدء.',
     stat_started:"امتحانات بدأتها", stat_finished:"المنتهية", stat_success_rate:"معدل النجاح (المصححة)",
     row_finished:"منتهٍ", row_in_progress:"قيد التقدم",
-    btn_review:"مراجعة", btn_continue:"استمرار", btn_open:"فتح",
+    btn_review:"مراجعة", btn_continue:"استمرار", btn_open:"فتح", btn_review_mistakes:"مراجعة أخطائي",
+    mistakes_title:"أخطائي", mistakes_empty:"لا توجد أخطاء لمراجعتها حاليًا — إما أنك لم تُجب بعد عن أسئلة مصححة، أو أنك أجبت عنها جميعًا بشكل صحيح!",
     no_exam_for_concours:"لا يوجد امتحان لهذه المباراة.", back_all_concours:"جميع المباريات", empty_no_exam:"لا يوجد امتحان.",
     inedit_title:"أسئلة حصرية", inedit_badge:"أصلي من Suprepa",
     inedit_desc:"أسئلة اختيار من متعدد حصرية بالكامل، مكتوبة بروح المباريات المغربية — لم تُطرح مطلقًا في جلسة حقيقية. مثالية لاختبار فهمك بعيدًا عن الامتحانات السابقة المعروفة، مع تصحيح وشرح منهجي لكل سؤال.",
@@ -685,6 +687,7 @@ window.addEventListener("hashchange", () => {
 function routeRank(parts){
   if (parts.length === 0) return 0; // home
   if (parts[0] === "progression") return 1;
+  if (parts[0] === "mistakes") return 1;
   if (parts[0] === "inedit"){
     if (parts.length === 1) return 1;
     if (parts.length === 2) return 2;
@@ -745,6 +748,7 @@ function route(){
   const parts = parseHash();
   if (parts.length === 0) return renderHome();
   if (parts[0] === "progression") return renderProgression();
+  if (parts[0] === "mistakes") return renderMistakes();
   if (parts[0] === "inedit" && parts.length === 1) return renderInedit();
   if (parts[0] === "inedit" && parts.length === 2) return renderIneditConcours(parts[1]);
   if (parts[0] === "inedit" && parts.length === 3) return renderIneditMatiere(parts[1], parts[2]);
@@ -752,6 +756,7 @@ function route(){
   if (parts[0] === "concours" && parts.length === 3) return renderMatiere(parts[1], parts[2]);
   if (parts[0] === "exam" && parts.length === 2) return renderModePicker(parts[1]);
   if (parts[0] === "exam" && parts.length === 3) return renderSession(parts[1], parts[2]);
+  if (parts[0] === "exam" && parts.length === 4) return renderSession(parts[1], parts[2], parseInt(parts[3], 10));
   return renderHome();
 }
 
@@ -953,14 +958,85 @@ function renderProgression(){
 
     app.innerHTML = `
       <div class="section-head"><h2>${t("progression_title")}</h2><span class="hint">${nExamens(items.length)}</span></div>
-      <div class="summary-grid" style="margin-bottom:32px;">
+      <div class="summary-grid" style="margin-bottom:20px;">
         <div class="summary-stat"><b>${items.length}</b><span>${t("stat_started")}</span></div>
         <div class="summary-stat"><b>${totalFinished}</b><span>${t("stat_finished")}</span></div>
         <div class="summary-stat"><b>${totalCorrectable ? Math.round(100*totalCorrect/totalCorrectable)+"%" : "—"}</b><span>${t("stat_success_rate")}</span></div>
       </div>
+      ${totalCorrectable - totalCorrect > 0 ? `<a class="btn gold" href="#/mistakes" style="margin-bottom:32px; display:inline-flex;">${t("btn_review_mistakes")}</a>` : ""}
       ${rowsHtml}
     `;
     animateCounters();
+  });
+}
+
+function renderMistakes(){
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/progression">${t("progression_title")}</a> / ${t("mistakes_title")}`);
+  const items = allProgress();
+
+  if (!items.length){
+    app.innerHTML = `
+      <div class="section-head"><h2>${t("mistakes_title")}</h2></div>
+      <div class="empty">${t("progression_empty")}</div>
+    `;
+    return;
+  }
+
+  app.innerHTML = `<div class="section-head"><h2>${t("mistakes_title")}</h2></div>` + skeletonRows(Math.min(items.length, 5));
+
+  Promise.all(items.map(({exam}) => loadExamQuestions(exam.id).catch(() => []))).then(questionsList => {
+    Promise.all(items.map(({exam}) => loadCorrections(exam.id).catch(() => []))).then(correctionsList => {
+      // Flatten every wrong answer across every exam the student has touched into one list —
+      // this is the thing localStorage-per-exam progress can't show on its own: what to
+      // review RIGHT NOW, regardless of which exam it came from.
+      const mistakes = [];
+      items.forEach(({exam, data}, ei) => {
+        const questions = questionsList[ei] || [];
+        const corrections = correctionsList[ei] || [];
+        Object.keys(data.answers || {}).forEach(qi => {
+          const idx = Number(qi);
+          const given = data.answers[idx];
+          const c = corrections[idx];
+          const q = questions[idx];
+          if (!q || !c || !c.correct || !given || given === c.correct) return;
+          mistakes.push({exam, mode: data.mode || "cours", idx, q, given, correct: c.correct, explanation: c.explanation});
+        });
+      });
+
+      if (!mistakes.length){
+        app.innerHTML = `
+          <a class="backlink" href="#/progression">${backArrow()} ${t("progression_title")}</a>
+          <div class="section-head"><h2>${t("mistakes_title")}</h2></div>
+          <div class="empty">${t("mistakes_empty")}</div>
+        `;
+        return;
+      }
+
+      const rowsHtml = mistakes.map(m => {
+        const givenOpt = m.q.options.find(o => o.letter === m.given);
+        const correctOpt = m.q.options.find(o => o.letter === m.correct);
+        return `
+        <div class="question-card" style="margin-bottom:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+            <span class="qnum" style="margin-bottom:0;">${escapeHtml(m.exam.concours)} · ${escapeHtml(m.exam.matiere)} · ${m.q.num}</span>
+            <a class="btn" href="#/exam/${m.exam.id}/${m.mode}/${m.idx}">${t("btn_review")}</a>
+          </div>
+          <div class="qtext"><p>${escapeHtml(m.q.text)}</p></div>
+          <div class="notice" style="border-color:var(--red);">
+            <div>${currentLang === "ar" ? "إجابتك" : "Ta réponse"} : <b style="color:var(--red);">${m.given} — ${escapeHtml(givenOpt ? givenOpt.text : "")}</b></div>
+            <div style="margin-top:4px;">${currentLang === "ar" ? "الإجابة الصحيحة" : "Réponse correcte"} : <b style="color:var(--green);">${m.correct} — ${escapeHtml(correctOpt ? correctOpt.text : "")}</b></div>
+            ${m.explanation ? `<div style="margin-top:8px;">${escapeHtml(m.explanation)}</div>` : ""}
+          </div>
+        </div>`;
+      }).join("");
+
+      app.innerHTML = `
+        <a class="backlink" href="#/progression">${backArrow()} ${t("progression_title")}</a>
+        <div class="section-head"><h2>${t("mistakes_title")}</h2><span class="hint">${nQuestions(mistakes.length)}</span></div>
+        ${rowsHtml}
+      `;
+      renderMath();
+    });
   });
 }
 
@@ -1149,7 +1225,7 @@ function renderModePicker(examId){
   `;
 }
 
-async function renderSession(examId, mode){
+async function renderSession(examId, mode, startIdx){
   const exam = examById(examId);
   if (!exam) return renderHome();
   setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/exam/${exam.id}">${escapeHtml(exam.concours)} ${escapeHtml(exam.matiere)} ${exam.annee}</a> / ${mode === "examen" ? t("crumb_examen") : t("crumb_cours")}`);
@@ -1165,7 +1241,7 @@ async function renderSession(examId, mode){
 
   const progress = loadProgress(examId);
   const state = {
-    idx: 0,
+    idx: (Number.isInteger(startIdx) && startIdx >= 0 && startIdx < questions.length) ? startIdx : 0,
     answers: progress.answers || {},
     flagged: progress.flagged || {},
     mode,
@@ -1350,7 +1426,7 @@ async function renderSession(examId, mode){
     const flaggedHtml = flaggedIdx.length ? `
       <div class="section-head" style="margin-top:32px;"><h2 style="font-size:18px;">${t("flagged_questions")}</h2><span class="hint">${flaggedIdx.length}</span></div>
       <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(90px,1fr));">
-        ${flaggedIdx.map(i => `<a class="btn ghost" style="text-align:center;" href="#/exam/${exam.id}/${mode}" data-goto="${i}">${questions[i].num}</a>`).join("")}
+        ${flaggedIdx.map(i => `<a class="btn ghost" style="text-align:center;" href="#/exam/${exam.id}/${mode}/${i}">${questions[i].num}</a>`).join("")}
       </div>` : "";
 
     const correctableNotice = correctableIdx.length
@@ -1479,3 +1555,13 @@ boot();
   results.addEventListener("click", () => { results.classList.remove("open"); input.value=""; });
   input.addEventListener("keydown", (e) => { if (e.key === "Escape"){ input.blur(); results.classList.remove("open"); } });
 })();
+
+// ---------- Offline support ----------
+// Registered after "load" so it never competes with the initial page render for
+// bandwidth/priority. A previously-opened exam stays reviewable with no connection —
+// see sw.js for what's actually cached and why.
+if ("serviceWorker" in navigator){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}

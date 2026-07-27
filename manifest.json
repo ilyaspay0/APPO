@@ -1,0 +1,18 @@
+{
+  "name": "Suprepa — Préparation aux concours marocains",
+  "short_name": "Suprepa",
+  "description": "QCM corrigés et expliqués pour les concours marocains — ENSA, ENSAM, Médecine, ISPITS, ENCG et bien d'autres.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F3F7FC",
+  "theme_color": "#1660D1",
+  "lang": "fr",
+  "dir": "ltr",
+  "icons": [
+    { "src": "images/logo-64.png", "sizes": "64x64", "type": "image/png" },
+    { "src": "images/logo-96.png", "sizes": "96x96", "type": "image/png" },
+    { "src": "images/logo-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}
