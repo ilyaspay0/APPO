@@ -91,7 +91,13 @@ const I18N = {
     good_score_msg:"Bon score sur les questions corrigées — continue comme ça.",
     notice_no_correctable:"Aucune question de cet examen n'est corrigée pour le moment.",
     review_answers_hint:"Revois tes réponses en détail ci-dessous.", flagged_questions:"Questions marquées",
-    btn_review_answers:"Revoir les réponses", btn_other_exams:"Autres examens", search_no_results:"Aucun résultat pour"
+    btn_review_answers:"Revoir les réponses", btn_other_exams:"Autres examens", search_no_results:"Aucun résultat pour",
+    comments_show:"💬 Commentaires", comments_login_prompt:"Connecte-toi pour poser une question ou répondre à quelqu'un.",
+    comments_login_btn:"Se connecter", comments_placeholder:"Pose ta question ou aide quelqu'un…",
+    comments_reply_placeholder:"Ta réponse…", comments_send:"Publier", comments_reply:"Répondre",
+    comments_cancel:"Annuler", comments_report:"Signaler", comments_reported:"Signalé, merci",
+    comments_delete:"Supprimer", comments_empty:"Aucun commentaire pour l'instant — sois le premier à poser une question.",
+    comments_error:"Impossible de charger les commentaires.", comments_hidden_reported:"Commentaire masqué (signalé plusieurs fois).",
   },
   ar: {
     nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", skip_to_content:"الانتقال إلى المحتوى",
@@ -165,7 +171,13 @@ const I18N = {
     good_score_msg:"نتيجة جيدة في الأسئلة المصححة — واصل على هذا المنوال.",
     notice_no_correctable:"لا يوجد سؤال مصحح في هذا الامتحان حاليًا.",
     review_answers_hint:"راجع إجاباتك بالتفصيل أدناه.", flagged_questions:"الأسئلة المحددة",
-    btn_review_answers:"مراجعة الإجابات", btn_other_exams:"امتحانات أخرى", search_no_results:"لا نتائج لـ"
+    btn_review_answers:"مراجعة الإجابات", btn_other_exams:"امتحانات أخرى", search_no_results:"لا نتائج لـ",
+    comments_show:"💬 التعليقات", comments_login_prompt:"سجّل الدخول لطرح سؤال أو الرد على أحد.",
+    comments_login_btn:"تسجيل الدخول", comments_placeholder:"اطرح سؤالك أو ساعد أحدًا…",
+    comments_reply_placeholder:"ردّك…", comments_send:"نشر", comments_reply:"الرد",
+    comments_cancel:"إلغاء", comments_report:"الإبلاغ", comments_reported:"تم الإبلاغ، شكرًا",
+    comments_delete:"حذف", comments_empty:"لا توجد تعليقات بعد — كن أول من يطرح سؤالاً.",
+    comments_error:"تعذر تحميل التعليقات.", comments_hidden_reported:"تعليق مخفي (تم الإبلاغ عنه عدة مرات).",
   }
 };
 
@@ -401,13 +413,21 @@ function fmtTime(sec){
 }
 
 // ---------- Data indexing ----------
-const CONCOURS_ORDER = ["Médecine","ENSA","ENSAM","ENCG","ISPITS"];
+const CONCOURS_ORDER = ["Médecine","ENSA","ENSAM","ENCG","ISPITS","IAV","IFMIA","ISCAE","UM6P","UM6SS","ENSCK","ENAM","ENA"];
 const CONCOURS_DESC = {
   "Médecine":"FMPM, FMPR, FMPF, FMPC — Biologie, Chimie, Physique, Mathématiques",
   "ENSA":"Écoles Nationales des Sciences Appliquées — Mathématiques, Physique, Chimie",
   "ENSAM":"Écoles Nationales Sup. d'Arts et Métiers — Mathématiques, Physique",
   "ENCG":"Concours TAFEM — Culture générale, Linguistique, Résolution de problèmes",
-  "ISPITS":"Instituts Sup. des Professions Infirmières — Biologie, Chimie, Physique"
+  "ISPITS":"Instituts Sup. des Professions Infirmières — Biologie, Chimie, Physique",
+  "IAV":"Institut Agronomique et Vétérinaire Hassan II — Culture générale, Sciences, Logique",
+  "IFMIA":"Institut de Formation aux Métiers de l'Industrie Automobile — Physique, Technique, Logique",
+  "ISCAE":"Institut Supérieur de Commerce et d'Administration des Entreprises — Mathématiques, Anglais, Culture générale",
+  "UM6P":"Université Mohammed VI Polytechnique — Architecture, Informatique, Sciences médicales",
+  "UM6SS":"Université Mohammed VI des Sciences et de la Santé — Mathématiques, Physique, Biologie",
+  "ENSCK":"École Nationale Supérieure de Chimie de Kénitra — Chimie, Physique, Mathématiques",
+  "ENAM":"École Nationale d'Agriculture de Meknès — Biologie, Physique, Mathématiques",
+  "ENA":"Écoles Nationales d'Architecture — Culture générale, Logique spatiale, Dessin technique"
 };
 
 function byConcours(concours){
@@ -662,6 +682,46 @@ async function mergeCloudProgress(uid){
 
     if (location.hash.replace(/^#\/?/, "").split("/")[0] === "progression") route();
   }catch(e){ console.warn("cloud merge failed", e); }
+}
+
+// ---------- Comments (per-question, connexion requise pour poster) ----------
+const FLAG_HIDE_THRESHOLD = 3; // masqué côté client au-delà de ce nombre de signalements
+
+async function loadComments(examId, idx){
+  if (!sbClient) return [];
+  const { data, error } = await sbClient
+    .from("comments")
+    .select("id, parent_id, user_id, display_name, body, flagged_count, created_at")
+    .eq("exam_id", examId)
+    .eq("question_idx", idx)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function postComment(examId, idx, body, parentId){
+  if (!sbClient || !currentUser) return null;
+  const displayName = (currentUser.email || "").split("@")[0] || "Étudiant";
+  const { data, error } = await sbClient
+    .from("comments")
+    .insert({
+      exam_id: examId, question_idx: idx, parent_id: parentId || null,
+      user_id: currentUser.id, display_name: displayName, body: body.trim()
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteComment(commentId){
+  if (!sbClient || !currentUser) return;
+  await sbClient.from("comments").delete().eq("id", commentId).eq("user_id", currentUser.id);
+}
+
+async function reportComment(commentId){
+  if (!sbClient || !currentUser) return;
+  await sbClient.from("comment_reports").insert({ comment_id: commentId, reporter_id: currentUser.id });
 }
 
 // ---------- Router ----------
@@ -1248,7 +1308,10 @@ async function renderSession(examId, mode, startIdx){
     secondsLeft: mode === "examen" ? Math.round(exam.n * 90) : null,
     finished: false,
     reviewMode: !!progress.finishedAt,
-    corrections: null
+    corrections: null,
+    commentsOpen: {},
+    commentsCache: {},
+    replyTo: null
   };
 
   function persist(finishedNow){
@@ -1269,6 +1332,74 @@ async function renderSession(examId, mode, startIdx){
       catch(e){ state.corrections = questions.map(() => ({correct:null, explanation:null})); }
     }
     return state.corrections;
+  }
+
+  function renderCommentsBlock(idx){
+    const open = !!state.commentsOpen[idx];
+    const cache = state.commentsCache[idx]; // undefined = pas encore chargé, "error" = échec, tableau = chargé
+    let count = "";
+    let body = "";
+
+    if (open){
+      if (cache === undefined){
+        body = `<div class="comments-loading">…</div>`;
+      } else if (cache === "error"){
+        body = `<div class="comments-empty">${t("comments_error")}</div>`;
+      } else {
+        const visible = cache.filter(c => c.flagged_count < FLAG_HIDE_THRESHOLD);
+        const hiddenCount = cache.length - visible.length;
+        const topLevel = visible.filter(c => !c.parent_id);
+        const repliesByParent = {};
+        visible.filter(c => c.parent_id).forEach(c => {
+          (repliesByParent[c.parent_id] = repliesByParent[c.parent_id] || []).push(c);
+        });
+        count = ` (${topLevel.length})`;
+
+        const dateFmt = (iso) => new Date(iso).toLocaleDateString(currentLang === "ar" ? "ar" : "fr-FR", {day:"numeric", month:"short"});
+        const renderOne = (c, isReply) => {
+          const mine = currentUser && c.user_id === currentUser.id;
+          return `
+          <div class="comment-item${isReply ? " comment-reply" : ""}">
+            <div class="comment-meta"><b>${escapeHtml(c.display_name)}</b> · <span class="comment-date">${dateFmt(c.created_at)}</span></div>
+            <div class="comment-body">${escapeHtml(c.body)}</div>
+            <div class="comment-actions">
+              ${!isReply && currentUser ? `<button class="comment-action-btn" data-reply-to="${c.id}">${t("comments_reply")}</button>` : ""}
+              ${currentUser && !mine ? `<button class="comment-action-btn" data-report="${c.id}">${t("comments_report")}</button>` : ""}
+              ${mine ? `<button class="comment-action-btn" data-delete="${c.id}">${t("comments_delete")}</button>` : ""}
+            </div>
+            ${state.replyTo === c.id ? `
+              <form class="comment-reply-form" data-parent="${c.id}">
+                <textarea required maxlength="2000" placeholder="${escapeHtml(t("comments_reply_placeholder"))}"></textarea>
+                <div style="display:flex; gap:8px; margin-top:6px;">
+                  <button type="submit" class="btn primary" style="padding:6px 14px;">${t("comments_send")}</button>
+                  <button type="button" class="btn" data-cancel-reply style="padding:6px 14px;">${t("comments_cancel")}</button>
+                </div>
+              </form>` : ""}
+            ${(repliesByParent[c.id]||[]).map(r => renderOne(r, true)).join("")}
+          </div>`;
+        };
+
+        body = `
+          ${topLevel.length ? topLevel.map(c => renderOne(c, false)).join("") : `<div class="comments-empty">${t("comments_empty")}</div>`}
+          ${hiddenCount ? `<div class="comments-hidden-note">${hiddenCount} ${t("comments_hidden_reported")}</div>` : ""}
+          ${currentUser ? `
+            <form class="comment-new-form">
+              <textarea required maxlength="2000" placeholder="${escapeHtml(t("comments_placeholder"))}"></textarea>
+              <button type="submit" class="btn primary" style="margin-top:8px;">${t("comments_send")}</button>
+            </form>` : `
+            <div class="comments-login-prompt">
+              <span>${t("comments_login_prompt")}</span><br>
+              <button type="button" class="btn primary" id="commentsLoginBtn" style="margin-top:8px;">${t("comments_login_btn")}</button>
+            </div>`}
+        `;
+      }
+    }
+
+    return `
+      <div class="comments-block">
+        <button class="comments-toggle" id="commentsToggle" type="button" aria-expanded="${open}">${t("comments_show")}${count}</button>
+        <div class="comments-body" ${open ? "" : "hidden"}>${body}</div>
+      </div>`;
   }
 
   async function renderQuestion(){
@@ -1335,6 +1466,8 @@ async function renderSession(examId, mode, startIdx){
         <div class="swipe-hint">${t("swipe_hint")}</div>
       </div>
 
+      ${renderCommentsBlock(state.idx)}
+
       <div class="session-nav" style="margin-top:20px;">
         <button class="btn" id="prevBtn" ${state.idx===0 ? "disabled":""}>${backArrow()} ${t("btn_prev")}</button>
         <span class="mid">${Object.keys(state.answers).length} / ${total} ${currentLang === "ar" ? "تمت الإجابة عنها" : "répondues"}</span>
@@ -1371,6 +1504,84 @@ async function renderSession(examId, mode, startIdx){
       if (state.idx < total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }
       else { state.finished = true; state.reviewMode = true; persist(true); await renderQuestion(); window.scrollTo(0,0); }
     });
+
+    const commentsToggle = $("#commentsToggle");
+    if (commentsToggle){
+      commentsToggle.addEventListener("click", async () => {
+        const idxAtClick = state.idx;
+        const wasOpen = !!state.commentsOpen[idxAtClick];
+        state.commentsOpen[idxAtClick] = !wasOpen;
+        if (!wasOpen && state.commentsCache[idxAtClick] === undefined){
+          await renderQuestion(); // affiche l'état "ouvert + chargement" tout de suite
+          try{ state.commentsCache[idxAtClick] = await loadComments(examId, idxAtClick); }
+          catch(e){ state.commentsCache[idxAtClick] = "error"; }
+        }
+        await renderQuestion();
+      });
+    }
+    const commentsBody = $(".comments-body");
+    if (commentsBody){
+      const newForm = commentsBody.querySelector(".comment-new-form");
+      if (newForm){
+        newForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const idxAtClick = state.idx;
+          const ta = newForm.querySelector("textarea");
+          const body = ta.value.trim();
+          if (!body) return;
+          try{
+            const inserted = await postComment(examId, idxAtClick, body, null);
+            if (Array.isArray(state.commentsCache[idxAtClick])) state.commentsCache[idxAtClick].push(inserted);
+          }catch(err){ console.warn("post comment failed", err); }
+          await renderQuestion();
+        });
+      }
+      commentsBody.querySelectorAll(".comment-reply-form").forEach(form => {
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const idxAtClick = state.idx;
+          const ta = form.querySelector("textarea");
+          const body = ta.value.trim();
+          if (!body) return;
+          try{
+            const inserted = await postComment(examId, idxAtClick, body, form.dataset.parent);
+            if (Array.isArray(state.commentsCache[idxAtClick])) state.commentsCache[idxAtClick].push(inserted);
+          }catch(err){ console.warn("post reply failed", err); }
+          state.replyTo = null;
+          await renderQuestion();
+        });
+      });
+      commentsBody.querySelectorAll("[data-reply-to]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          state.replyTo = state.replyTo === btn.dataset.replyTo ? null : btn.dataset.replyTo;
+          await renderQuestion();
+        });
+      });
+      commentsBody.querySelectorAll("[data-cancel-reply]").forEach(btn => {
+        btn.addEventListener("click", async () => { state.replyTo = null; await renderQuestion(); });
+      });
+      commentsBody.querySelectorAll("[data-report]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          btn.disabled = true; btn.textContent = t("comments_reported");
+          try{ await reportComment(btn.dataset.report); }catch(err){ console.warn("report failed", err); }
+        });
+      });
+      commentsBody.querySelectorAll("[data-delete]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const idxAtClick = state.idx;
+          const id = btn.dataset.delete;
+          try{
+            await deleteComment(id);
+            if (Array.isArray(state.commentsCache[idxAtClick])){
+              state.commentsCache[idxAtClick] = state.commentsCache[idxAtClick].filter(c => c.id !== id && c.parent_id !== id);
+            }
+          }catch(err){ console.warn("delete comment failed", err); }
+          await renderQuestion();
+        });
+      });
+      const loginBtn = commentsBody.querySelector("#commentsLoginBtn");
+      if (loginBtn) loginBtn.addEventListener("click", openAuthModal);
+    }
 
     // Swipe gauche/droite pour naviguer entre les questions (mobile)
     enableSwipeNav($(".question-card"), {
