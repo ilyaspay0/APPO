@@ -20,7 +20,7 @@ const prefersReducedMotion = () =>
 // rules (singular/dual/plural-3-10/plural-11+) — that's a known simplification, not a bug.
 const I18N = {
   fr: {
-    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", skip_to_content:"Aller au contenu",
+    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", nav_bac2:"Concours Bac+2", skip_to_content:"Aller au contenu",
     search_placeholder:"Chercher un concours, une matière…",
     theme_to_dark:"Passer en mode sombre", theme_to_light:"Passer en mode clair",
     lang_to_ar:"Passer l'interface en arabe", lang_to_fr:"Passer l'interface en français",
@@ -74,6 +74,15 @@ const I18N = {
     inedit_empty:"Aucune question inédite disponible pour le moment.", inedit_no_concours:"Aucune question inédite pour ce concours.",
     inedit_matiere_hint:"Questions inédites, jamais tombées en concours", inedit_empty_lots:"Aucun lot disponible.",
     corrige_100:"100% corrigées",
+    bac2_title:"Concours Bac+2", bac2_badge:"Réponse libre",
+    bac2_desc:"Épreuves d'admission destinées aux étudiants ayant déjà validé un Bac+2 (classes préparatoires, DEUG, DUT...) — des exercices à réponse rédigée, pas des QCM. Tape ta réponse, compare-la à la réponse modèle, puis consulte la correction détaillée.",
+    bac2_empty:"Aucune épreuve Bac+2 disponible pour le moment.",
+    bac2_free_response:"Réponse rédigée", bac2_type_qcm:"QCM",
+    bac2_similarity:"Similarité avec la réponse modèle", bac2_similarity_hint:"indicatif, pas une note",
+    bac2_model_answer:"Réponse modèle et explication",
+    bac2_placeholder:"Tape ta réponse ici…",
+    bac2_check_similarity:"Vérifier ma similarité", bac2_reveal:"Voir la réponse et l'explication",
+    bac2_reviewed:"consultées",
     mode_cours_tag:"Mode cours", mode_cours_title:"Question par question",
     mode_cours_desc:"Avance à ton rythme, reviens en arrière, pas de chronomètre. Idéal pour découvrir les notions.",
     btn_start:"Commencer", mode_examen_tag:"Mode examen", mode_examen_title:"Chronométré",
@@ -100,7 +109,7 @@ const I18N = {
     comments_error:"Impossible de charger les commentaires.", comments_hidden_reported:"Commentaire masqué (signalé plusieurs fois).",
   },
   ar: {
-    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", skip_to_content:"الانتقال إلى المحتوى",
+    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", nav_bac2:"مباريات Bac+2", skip_to_content:"الانتقال إلى المحتوى",
     search_placeholder:"ابحث عن مباراة أو مادة…",
     theme_to_dark:"التبديل إلى الوضع الداكن", theme_to_light:"التبديل إلى الوضع الفاتح",
     lang_to_ar:"التبديل إلى العربية", lang_to_fr:"التبديل إلى الفرنسية",
@@ -154,6 +163,15 @@ const I18N = {
     inedit_empty:"لا توجد أسئلة حصرية متوفرة حاليًا.", inedit_no_concours:"لا توجد أسئلة حصرية لهذه المباراة.",
     inedit_matiere_hint:"أسئلة حصرية، لم تُطرح مطلقًا في المباراة", inedit_empty_lots:"لا توجد مجموعة متوفرة.",
     corrige_100:"مصححة 100%",
+    bac2_title:"مباريات Bac+2", bac2_badge:"إجابة حرة",
+    bac2_desc:"مباريات ولوج مخصصة للطلبة الحاصلين على Bac+2 (أقسام تحضيرية، DEUG، DUT...) — تمارين بإجابة مُحررة، وليست أسئلة اختيار من متعدد. اكتب إجابتك، قارنها بالإجابة النموذجية، ثم اطّلع على التصحيح المفصل.",
+    bac2_empty:"لا توجد مباراة Bac+2 متوفرة حاليًا.",
+    bac2_free_response:"إجابة مُحررة", bac2_type_qcm:"اختيار من متعدد",
+    bac2_similarity:"التشابه مع الإجابة النموذجية", bac2_similarity_hint:"مؤشر تقريبي، وليس علامة",
+    bac2_model_answer:"الإجابة النموذجية والشرح",
+    bac2_placeholder:"اكتب إجابتك هنا…",
+    bac2_check_similarity:"تحقق من نسبة التشابه", bac2_reveal:"عرض الإجابة والشرح",
+    bac2_reviewed:"تمت مراجعتها",
     mode_cours_tag:"وضع المراجعة", mode_cours_title:"سؤال بسؤال",
     mode_cours_desc:"تقدم بالسرعة التي تناسبك، والرجوع للخلف ممكن، بدون توقيت. مثالي لاكتشاف المفاهيم.",
     btn_start:"ابدأ", mode_examen_tag:"وضع الامتحان", mode_examen_title:"محدد بوقت",
@@ -488,7 +506,59 @@ async function loadCorrections(id){
   return data.corrections;
 }
 
-// ---------- Progress storage ----------
+// ---------- Bac+2 (réponse libre) — données et stockage séparés du QCM ----------
+let BAC2_DB = [];
+const bac2QuestionsCache = new Map();
+const bac2AnswersCache = new Map();
+
+async function loadBac2Meta(){
+  const res = await fetch("/api/bac2-exams");
+  if (!res.ok) throw new Error("bac2 exams meta fetch failed");
+  BAC2_DB = await res.json();
+}
+async function loadBac2Questions(id){
+  if (bac2QuestionsCache.has(id)) return bac2QuestionsCache.get(id);
+  const res = await fetch("/api/bac2-exam?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("bac2 exam fetch failed");
+  const data = await res.json();
+  bac2QuestionsCache.set(id, data);
+  return data;
+}
+async function loadBac2Answers(id){
+  if (bac2AnswersCache.has(id)) return bac2AnswersCache.get(id);
+  const res = await fetch("/api/bac2-correction?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("bac2 correction fetch failed");
+  const data = await res.json();
+  bac2AnswersCache.set(id, data.answers);
+  return data.answers;
+}
+function loadBac2Progress(examId){
+  try{ return JSON.parse(localStorage.getItem("suprepa:bac2progress:"+examId)) || {}; }
+  catch(e){ return {}; }
+}
+function saveBac2Progress(examId, data){
+  try{ localStorage.setItem("suprepa:bac2progress:"+examId, JSON.stringify(data)); }catch(e){}
+}
+
+// Approximate self-check, not authoritative grading: two technically-correct answers
+// can be phrased very differently (especially for math/derivations), so this is a rough
+// word-overlap indicator to nudge self-assessment — always paired with a real reveal button.
+function textSimilarity(a, b){
+  const tokenize = s => (s || "").toLowerCase()
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/).filter(w => w.length > 2);
+  const wa = new Set(tokenize(a));
+  const wb = new Set(tokenize(b));
+  if (!wa.size || !wb.size) return 0;
+  let inter = 0;
+  wa.forEach(w => { if (wb.has(w)) inter++; });
+  const union = new Set([...wa, ...wb]).size;
+  return union ? Math.round((inter / union) * 100) : 0;
+}
+
+
+// ---------- Progress storage (QCM) ----------
 function loadProgress(examId){
   try{ return JSON.parse(localStorage.getItem("prepari:progress:"+examId)) || {}; }
   catch(e){ return {}; }
@@ -759,6 +829,9 @@ function routeRank(parts){
   if (parts[0] === "exam"){
     return parts.length === 2 ? 3 : 4; // mode picker -> session
   }
+  if (parts[0] === "bac2"){
+    return parts.length <= 2 ? 1 : 2; // bac2 list -> bac2 session
+  }
   return 0;
 }
 let lastRouteRank = null;
@@ -817,6 +890,9 @@ function route(){
   if (parts[0] === "exam" && parts.length === 2) return renderModePicker(parts[1]);
   if (parts[0] === "exam" && parts.length === 3) return renderSession(parts[1], parts[2]);
   if (parts[0] === "exam" && parts.length === 4) return renderSession(parts[1], parts[2], parseInt(parts[3], 10));
+  if (parts[0] === "bac2" && parts.length === 1) return renderBac2Home();
+  if (parts[0] === "bac2" && parts.length === 2) return renderBac2Session(parts[1]);
+  if (parts[0] === "bac2" && parts.length === 3) return renderBac2Session(parts[1], parseInt(parts[2], 10));
   return renderHome();
 }
 
@@ -1283,6 +1359,189 @@ function renderModePicker(examId){
       </a>
     </div>
   `;
+}
+
+// ---------- Bac+2 section (réponse libre) — complètement séparée du parcours QCM ----------
+async function renderBac2Home(){
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("bac2_title")}`);
+  if (!BAC2_DB.length){
+    app.innerHTML = skeletonRows(3);
+    try{ await loadBac2Meta(); }
+    catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), renderBac2Home); return; }
+  }
+  const cards = BAC2_DB.map(e => `
+    <a class="card" href="#/bac2/${e.id}">
+      <span class="eyebrow">${escapeHtml(e.annee)}</span>
+      <h3>${escapeHtml(e.concours)}${e.matiere && e.matiere !== "Épreuve générale" ? ` · ${escapeHtml(e.matiere)}` : ""}</h3>
+      <div class="meta">${nQuestions(e.n)} · ${e.type === "qcm" ? t("bac2_type_qcm") : t("bac2_free_response")}</div>
+    </a>`).join("");
+  app.innerHTML = `
+    <div class="inedit-hero">
+      <span class="badge-original">${t("bac2_badge")}</span>
+      <div class="section-head" style="margin:12px 0 0;"><h2 style="margin:0;">${t("bac2_title")}</h2></div>
+      <p>${t("bac2_desc")}</p>
+    </div>
+    ${cards ? `<div class="grid">${cards}</div>` : `<div class="empty">${t("bac2_empty")}</div>`}
+  `;
+}
+
+async function renderBac2Session(examId, startIdx){
+  if (!BAC2_DB.length){
+    try{ await loadBac2Meta(); }catch(e){ /* exam meta below will 404 gracefully */ }
+  }
+  const meta = BAC2_DB.find(e => e.id === examId);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/bac2">${t("bac2_title")}</a> / ${meta ? escapeHtml(meta.concours) : "…"}`);
+
+  app.innerHTML = skeletonQuestionCard();
+  let exam;
+  try{ exam = await loadBac2Questions(examId); }
+  catch(e){ app.innerHTML = retryBlock(t("err_load_exam"), () => renderBac2Session(examId, startIdx)); return; }
+
+  const progress = loadBac2Progress(examId);
+  const state = {
+    idx: (Number.isInteger(startIdx) && startIdx >= 0 && startIdx < exam.questions.length) ? startIdx : 0,
+    drafts: progress.drafts || {},    // texte tapé par l'étudiant (type "libre"), par index de question
+    revealed: progress.revealed || {},// questions dont la réponse modèle a été affichée (type "libre")
+    answers: progress.answers || {}   // lettre choisie par l'étudiant (type "qcm"), par index de question
+  };
+  const isQcm = exam.type === "qcm";
+
+  function persist(){
+    saveBac2Progress(examId, { drafts: state.drafts, revealed: state.revealed, answers: state.answers, updatedAt: Date.now() });
+  }
+
+  async function renderQuestion(){
+    const q = exam.questions[state.idx];
+    const total = exam.questions.length;
+
+    if (isQcm){
+      const selected = state.answers[state.idx];
+      let optionsHtml = q.options.map(o => {
+        let cls = "option";
+        if (selected){
+          if (o.letter === selected) cls += " selected";
+        }
+        return `<button class="${cls}" data-letter="${o.letter}" ${selected ? "disabled" : ""}>
+          <span class="letter">${o.letter}</span><span>${escapeHtml(o.text)}</span>
+        </button>`;
+      }).join("");
+      let correctionHtml = "";
+      if (selected){
+        try{
+          const answers = await loadBac2Answers(examId);
+          const info = answers[state.idx];
+          const isRight = info && selected === info.correct;
+          correctionHtml = `
+            <div class="notice" style="border-color:${isRight? 'var(--green)':'var(--red)'};">
+              <b style="color:${isRight? 'var(--green)':'var(--red)'};">${isRight ? t("correct_answer_right") : t("correct_answer_wrong")} — ${currentLang === "ar" ? `الإجابة الصحيحة: ${info.correct}` : `réponse correcte : ${info.correct}`}</b>
+              ${info.explanation ? `<div style="margin-top:8px;">${escapeHtml(info.explanation)}</div>` : ""}
+            </div>`;
+        }catch(e){
+          correctionHtml = `<div class="notice">${t("err_load_exam")}</div>`;
+        }
+      }
+      app.innerHTML = `
+        <div class="session-head">
+          <div>
+            <div class="title">${meta ? escapeHtml(meta.concours) : ""} ${meta ? `<span class="badge-original" style="margin-left:6px;">${t("bac2_badge")}</span>` : ""}</div>
+            <div class="sub">${currentLang === "ar" ? `${state.idx+1} من ${total}` : `Question ${state.idx+1} sur ${total}`}</div>
+          </div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${(state.idx+1)/total*100}%"></div></div>
+        <div class="question-card">
+          <span class="qnum">${q.num}</span>
+          <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+          <div class="options">${optionsHtml}</div>
+          ${correctionHtml}
+        </div>
+        <div class="session-nav" style="margin-top:20px;">
+          <button class="btn" id="prevBtn" ${state.idx===0 ? "disabled":""}>${backArrow()} ${t("btn_prev")}</button>
+          <span class="mid">${Object.keys(state.answers).length} / ${total} ${currentLang === "ar" ? "تمت الإجابة عنها" : "répondues"}</span>
+          <button class="btn primary" id="nextBtn" ${state.idx===total-1 ? "disabled":""}>${t("btn_next")}</button>
+        </div>
+      `;
+      renderMath();
+      document.querySelectorAll(".option").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          if (state.answers[state.idx]) return;
+          state.answers[state.idx] = btn.dataset.letter;
+          persist();
+          await renderQuestion();
+        });
+      });
+    } else {
+      const draft = state.drafts[state.idx] || "";
+      const isRevealed = !!state.revealed[state.idx];
+      let answerHtml = "";
+      if (isRevealed){
+        try{
+          const answers = await loadBac2Answers(examId);
+          const modelAnswer = (answers[state.idx] && answers[state.idx].answer) || "";
+          const sim = draft.trim() ? textSimilarity(draft, modelAnswer) : null;
+          answerHtml = `
+            <div class="notice" style="border-color:var(--green);">
+              ${sim !== null ? `<div style="margin-bottom:8px;"><b>${t("bac2_similarity")} : ${sim}%</b> <span style="color:var(--ink-soft); font-size:12.5px;">(${t("bac2_similarity_hint")})</span></div>` : ""}
+              <b style="color:var(--green);">${t("bac2_model_answer")}</b>
+              <div style="margin-top:8px; white-space:pre-wrap;">${escapeHtml(modelAnswer)}</div>
+            </div>`;
+        }catch(e){
+          answerHtml = `<div class="notice">${t("err_load_exam")}</div>`;
+        }
+      }
+
+      app.innerHTML = `
+        <div class="session-head">
+          <div>
+            <div class="title">${meta ? escapeHtml(meta.concours) : ""} ${meta ? `<span class="badge-original" style="margin-left:6px;">${t("bac2_badge")}</span>` : ""}</div>
+            <div class="sub">${currentLang === "ar" ? `${state.idx+1} من ${total}` : `Question ${state.idx+1} sur ${total}`}</div>
+          </div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${(state.idx+1)/total*100}%"></div></div>
+
+        <div class="question-card">
+          <span class="qnum">${q.num}</span>
+          <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+          <textarea id="bac2Answer" rows="6" placeholder="${escapeHtml(t("bac2_placeholder"))}"
+            style="width:100%; font-family:var(--font-body); font-size:14.5px; padding:14px; border-radius:var(--radius); border:1px solid var(--line); background:var(--paper); color:var(--ink); resize:vertical;">${escapeHtml(draft)}</textarea>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+            <button class="btn" id="bac2CheckBtn">${t("bac2_check_similarity")}</button>
+            <button class="btn gold" id="bac2RevealBtn">${t("bac2_reveal")}</button>
+          </div>
+          ${answerHtml}
+        </div>
+
+        <div class="session-nav" style="margin-top:20px;">
+          <button class="btn" id="prevBtn" ${state.idx===0 ? "disabled":""}>${backArrow()} ${t("btn_prev")}</button>
+          <span class="mid">${Object.keys(state.revealed).length} / ${total} ${t("bac2_reviewed")}</span>
+          <button class="btn primary" id="nextBtn" ${state.idx===total-1 ? "disabled":""}>${t("btn_next")}</button>
+        </div>
+      `;
+      renderMath();
+
+      const textarea = document.getElementById("bac2Answer");
+      textarea.addEventListener("input", () => {
+        state.drafts[state.idx] = textarea.value;
+        persist();
+      });
+      document.getElementById("bac2CheckBtn").addEventListener("click", async () => {
+        state.revealed[state.idx] = true;
+        persist();
+        await renderQuestion();
+      });
+      document.getElementById("bac2RevealBtn").addEventListener("click", async () => {
+        state.revealed[state.idx] = true;
+        persist();
+        await renderQuestion();
+      });
+    }
+
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    if (prevBtn) prevBtn.addEventListener("click", async () => { if (state.idx>0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }});
+    if (nextBtn) nextBtn.addEventListener("click", async () => { if (state.idx<total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }});
+  }
+
+  await renderQuestion();
 }
 
 async function renderSession(examId, mode, startIdx){
