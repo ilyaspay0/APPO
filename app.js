@@ -48,6 +48,7 @@ const I18N = {
     cover_status:"Statut", cover_ready:"Prêt",
     stat_questions:"Questions", stat_exams:"Examens", stat_concours:"Concours", stat_corrected:"Corrigées",
     section_choose_concours:"Choisis ton concours", section_resume:"Reprendre mes révisions", see_all:"Voir tout",
+    level_bac:"Bac", level_bac2:"Bac+2",
     section_why:"Pourquoi Suprepa ?",
     feature_free_title:"100% gratuit", feature_free_desc:"Toute la banque de QCM est accessible librement, sans compte obligatoire et sans frais cachés.",
     feature_corrections_title:"Corrections détaillées", feature_corrections_desc:"Chaque question corrigée est accompagnée d'une explication claire : la bonne réponse, et pourquoi les autres sont fausses.",
@@ -137,6 +138,7 @@ const I18N = {
     cover_status:"الحالة", cover_ready:"جاهز",
     stat_questions:"الأسئلة", stat_exams:"الامتحانات", stat_concours:"المباريات", stat_corrected:"المصححة",
     section_choose_concours:"اختر مباراتك", section_resume:"استئناف مراجعتي", see_all:"عرض الكل",
+    level_bac:"البكالوريا", level_bac2:"Bac+2",
     section_why:"لماذا Suprepa؟",
     feature_free_title:"مجاني 100%", feature_free_desc:"بنك الأسئلة بأكمله متاح مجانًا، بدون حساب إلزامي وبدون أي رسوم خفية.",
     feature_corrections_title:"تصحيحات مفصّلة", feature_corrections_desc:"كل سؤال مصحح مرفق بشرح واضح: الجواب الصحيح، وسبب خطأ الأجوبة الأخرى.",
@@ -447,6 +449,25 @@ const CONCOURS_DESC = {
   "ENAM":"École Nationale d'Agriculture de Meknès — Biologie, Physique, Mathématiques",
   "ENA":"Écoles Nationales d'Architecture — Culture générale, Logique spatiale, Dessin technique"
 };
+
+// Descriptions pour les concours qui n'existent QUE côté Bac+2 (les autres — IAV, ISPITS,
+// ENSAM — réutilisent CONCOURS_DESC ci-dessus).
+const BAC2_ONLY_DESC = {
+  "EHTP":"École Hassania des Travaux Publics — Mathématiques, Physique, Mécanique",
+  "EMI":"École Mohammadia d'Ingénieurs — Mathématiques, Physique, Sciences de l'ingénieur",
+  "ENSEM":"École Nationale Supérieure d'Électricité et de Mécanique — Mathématiques, Physique, Électricité",
+  "ENSIAS":"École Nationale Supérieure d'Informatique et d'Analyse des Systèmes — Mathématiques, Informatique",
+  "ENSMR":"École Nationale Supérieure des Mines de Rabat — Algèbre, Analyse, Mécanique, Électricité",
+  "INPT":"Institut National des Postes et Télécommunications — Mathématiques, Physique",
+  "INSEA":"Institut National de Statistique et d'Économie Appliquée — Mathématiques, Analyse, Probabilités"
+};
+function bac2Desc(concours){ return CONCOURS_DESC[concours] || BAC2_ONLY_DESC[concours] || ""; }
+function bac2ConcoursOrder(){
+  const seen = [];
+  BAC2_DB.forEach(e => { if (!seen.includes(e.concours)) seen.push(e.concours); });
+  return seen;
+}
+function bac2ByConcours(concours){ return BAC2_DB.filter(e => e.concours === concours); }
 
 function byConcours(concours){
   return EXAMS_DB.filter(e => e.concours === concours && e.source !== "suprepa");
@@ -824,13 +845,17 @@ function routeRank(parts){
     return 3; // inedit/concours/matière
   }
   if (parts[0] === "concours"){
+    if (parts.length === 1) return 1; // all-concours listing
     return parts.length === 2 ? 1 : 2; // concours -> concours/matière
   }
   if (parts[0] === "exam"){
     return parts.length === 2 ? 3 : 4; // mode picker -> session
   }
   if (parts[0] === "bac2"){
-    return parts.length <= 2 ? 1 : 2; // bac2 list -> bac2 session
+    if (parts.length === 1) return 1; // all bac2-concours listing
+    if (parts[1] === "concours") return 2; // bac2 concours -> exams list
+    if (parts[1] === "exam") return 3; // bac2 session
+    return 1;
   }
   return 0;
 }
@@ -885,18 +910,92 @@ function route(){
   if (parts[0] === "inedit" && parts.length === 1) return renderInedit();
   if (parts[0] === "inedit" && parts.length === 2) return renderIneditConcours(parts[1]);
   if (parts[0] === "inedit" && parts.length === 3) return renderIneditMatiere(parts[1], parts[2]);
+  if (parts[0] === "concours" && parts.length === 1) return renderAllConcours();
   if (parts[0] === "concours" && parts.length === 2) return renderConcours(parts[1]);
   if (parts[0] === "concours" && parts.length === 3) return renderMatiere(parts[1], parts[2]);
   if (parts[0] === "exam" && parts.length === 2) return renderModePicker(parts[1]);
   if (parts[0] === "exam" && parts.length === 3) return renderSession(parts[1], parts[2]);
   if (parts[0] === "exam" && parts.length === 4) return renderSession(parts[1], parts[2], parseInt(parts[3], 10));
   if (parts[0] === "bac2" && parts.length === 1) return renderBac2Home();
-  if (parts[0] === "bac2" && parts.length === 2) return renderBac2Session(parts[1]);
-  if (parts[0] === "bac2" && parts.length === 3) return renderBac2Session(parts[1], parseInt(parts[2], 10));
+  if (parts[0] === "bac2" && parts[1] === "concours" && parts.length === 3) return renderBac2Concours(parts[2]);
+  if (parts[0] === "bac2" && parts[1] === "exam" && parts.length === 3) return renderBac2Session(parts[2]);
+  if (parts[0] === "bac2" && parts[1] === "exam" && parts.length === 4) return renderBac2Session(parts[2], parseInt(parts[3], 10));
   return renderHome();
 }
 
 function setCrumbs(html){ crumbsEl.innerHTML = html; }
+
+// ---------- Concours picker (Bac / Bac+2 toggle, homepage sample of 5) ----------
+let homeLevel = "bac";
+function concoursCardHtml(c){
+  const exams = byConcours(c);
+  const q = exams.reduce((s,e)=>s+e.n,0);
+  return `
+    <a class="card concours-card" href="#/concours/${encodeURIComponent(c)}">
+      <span class="eyebrow">${nMatieres(matieresOf(c).length)}</span>
+      <h3>${c}</h3>
+      <div class="meta">${CONCOURS_DESC[c]||""}</div>
+      <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
+    </a>`;
+}
+function bac2ConcoursCardHtml(c){
+  const exams = bac2ByConcours(c);
+  const q = exams.reduce((s,e)=>s+e.n,0);
+  const hasQcm = exams.some(e => e.type === "qcm");
+  const hasLibre = exams.some(e => e.type !== "qcm");
+  const typeLabel = hasQcm && hasLibre ? `${t("bac2_type_qcm")} + ${t("bac2_free_response")}` : hasQcm ? t("bac2_type_qcm") : t("bac2_free_response");
+  return `
+    <a class="card concours-card" href="#/bac2/concours/${encodeURIComponent(c)}">
+      <span class="eyebrow">${typeLabel}</span>
+      <h3>${c}</h3>
+      <div class="meta">${bac2Desc(c)}</div>
+      <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
+    </a>`;
+}
+function concoursPickerBodyHtml(){
+  if (homeLevel === "bac"){
+    const list = CONCOURS_ORDER.filter(c => byConcours(c).length);
+    const sample = list.slice(0, 5).map(concoursCardHtml).join("");
+    return `<div class="grid">${sample}</div>
+      ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/concours">${t("see_all")} (${list.length})</a></div>` : ""}`;
+  }
+  if (!BAC2_DB.length){
+    return skeletonRows(2);
+  }
+  const list = bac2ConcoursOrder();
+  const sample = list.slice(0, 5).map(bac2ConcoursCardHtml).join("");
+  return `<div class="grid">${sample}</div>
+    ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/bac2">${t("see_all")} (${list.length})</a></div>` : ""}`;
+}
+function concoursPickerHtml(){
+  return `
+    <div class="section-head" id="concours-grid">
+      <h2>${t("section_choose_concours")}</h2>
+      <div class="level-tabs" role="tablist">
+        <button class="level-tab ${homeLevel==='bac'?'active':''}" data-level="bac" role="tab" aria-selected="${homeLevel==='bac'}">${t("level_bac")}</button>
+        <button class="level-tab ${homeLevel==='bac2'?'active':''}" data-level="bac2" role="tab" aria-selected="${homeLevel==='bac2'}">${t("level_bac2")}</button>
+      </div>
+    </div>
+    <div id="concoursPickerBody">${concoursPickerBodyHtml()}</div>`;
+}
+function wireConcoursPicker(){
+  document.querySelectorAll(".level-tab").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (btn.dataset.level === homeLevel) return;
+      homeLevel = btn.dataset.level;
+      document.querySelectorAll(".level-tab").forEach(b => {
+        b.classList.toggle("active", b.dataset.level === homeLevel);
+        b.setAttribute("aria-selected", b.dataset.level === homeLevel);
+      });
+      const body = document.getElementById("concoursPickerBody");
+      if (homeLevel === "bac2" && !BAC2_DB.length){
+        body.innerHTML = skeletonRows(2);
+        try{ await loadBac2Meta(); }catch(e){ /* falls back to empty state below */ }
+      }
+      body.innerHTML = concoursPickerBodyHtml();
+    });
+  });
+}
 
 // ---------- Views ----------
 function renderHome(){
@@ -905,18 +1004,6 @@ function renderHome(){
   const totalQ = browsableExams.reduce((s,e)=>s+e.n,0);
   const totalExams = browsableExams.length;
   const totalCorrected = browsableExams.reduce((s,e)=>s+(e.nCorrected||0),0);
-
-  const cards = CONCOURS_ORDER.filter(c => byConcours(c).length).map(c => {
-    const exams = byConcours(c);
-    const q = exams.reduce((s,e)=>s+e.n,0);
-    return `
-      <a class="card concours-card" href="#/concours/${encodeURIComponent(c)}">
-        <span class="eyebrow">${nMatieres(matieresOf(c).length)}</span>
-        <h3>${c}</h3>
-        <div class="meta">${CONCOURS_DESC[c]||""}</div>
-        <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
-      </a>`;
-  }).join("");
 
   const resume = allProgress()
     .filter(p => !p.data.finishedAt)
@@ -1030,14 +1117,14 @@ function renderHome(){
       <div class="stat-cell"><b>${totalCorrected.toLocaleString("fr-FR")}</b><span>${t("stat_corrected")}</span></div>
     </div>
 
-    <div class="section-head" id="concours-grid"><h2>${t("section_choose_concours")}</h2><span class="hint">${nExamens(totalExams)} ${currentLang === "ar" ? "مُفهرس" : "indexés"}</span></div>
-    <div class="grid">${cards}</div>
+    ${concoursPickerHtml()}
     ${resumeHtml}
     ${featuresHtml}
     ${stepsHtml}
     ${faqHtml}
     </div>
   `;
+  wireConcoursPicker();
   initScrollReveal();
 }
 
@@ -1174,6 +1261,17 @@ function renderMistakes(){
       renderMath();
     });
   });
+}
+
+function renderAllConcours(){
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("section_choose_concours")}`);
+  const list = CONCOURS_ORDER.filter(c => byConcours(c).length);
+  const cards = list.map(concoursCardHtml).join("");
+  app.innerHTML = `
+    <a class="backlink" href="#/">${backArrow()} ${t("nav_home")}</a>
+    <div class="section-head"><h2>${t("section_choose_concours")}</h2><span class="hint">${nExamens(list.length)}</span></div>
+    <div class="grid">${cards}</div>
+  `;
 }
 
 function renderConcours(concours){
@@ -1369,12 +1467,8 @@ async function renderBac2Home(){
     try{ await loadBac2Meta(); }
     catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), renderBac2Home); return; }
   }
-  const cards = BAC2_DB.map(e => `
-    <a class="card" href="#/bac2/${e.id}">
-      <span class="eyebrow">${escapeHtml(e.annee)}</span>
-      <h3>${escapeHtml(e.concours)}${e.matiere && e.matiere !== "Épreuve générale" ? ` · ${escapeHtml(e.matiere)}` : ""}</h3>
-      <div class="meta">${nQuestions(e.n)} · ${e.type === "qcm" ? t("bac2_type_qcm") : t("bac2_free_response")}</div>
-    </a>`).join("");
+  const list = bac2ConcoursOrder();
+  const cards = list.map(bac2ConcoursCardHtml).join("");
   app.innerHTML = `
     <div class="inedit-hero">
       <span class="badge-original">${t("bac2_badge")}</span>
@@ -1385,12 +1479,40 @@ async function renderBac2Home(){
   `;
 }
 
+async function renderBac2Concours(concours){
+  if (!BAC2_DB.length){
+    app.innerHTML = skeletonRows(3);
+    try{ await loadBac2Meta(); }
+    catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), () => renderBac2Concours(concours)); return; }
+  }
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/bac2">${t("bac2_title")}</a> / ${escapeHtml(concours)}`);
+  const exams = bac2ByConcours(concours);
+  const rows = exams.map(e => `
+    <div class="exam-row">
+      <div class="left">
+        <span class="year">${escapeHtml(e.annee)}</span>
+        <div>
+          <div style="font-weight:600;">${escapeHtml(e.matiere)}</div>
+          <div class="n">${nQuestions(e.n)} · ${e.type === "qcm" ? t("bac2_type_qcm") : t("bac2_free_response")}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="#/bac2/exam/${e.id}">${t("btn_open")}</a>
+      </div>
+    </div>`).join("");
+  app.innerHTML = `
+    <a class="backlink" href="#/bac2">${backArrow()} ${t("bac2_title")}</a>
+    <div class="section-head"><h2>${escapeHtml(concours)}</h2><span class="hint">${bac2Desc(concours)}</span></div>
+    ${rows || `<div class="empty">${t("empty_no_exam")}</div>`}
+  `;
+}
+
 async function renderBac2Session(examId, startIdx){
   if (!BAC2_DB.length){
     try{ await loadBac2Meta(); }catch(e){ /* exam meta below will 404 gracefully */ }
   }
   const meta = BAC2_DB.find(e => e.id === examId);
-  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/bac2">${t("bac2_title")}</a> / ${meta ? escapeHtml(meta.concours) : "…"}`);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/bac2">${t("bac2_title")}</a> / ${meta ? `<a href="#/bac2/concours/${encodeURIComponent(meta.concours)}">${escapeHtml(meta.concours)}</a>` : "…"}`);
 
   app.innerHTML = skeletonQuestionCard();
   let exam;
