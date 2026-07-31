@@ -489,7 +489,19 @@ const MASTER_DESC = {
   "ENCG":"Concours d'admission en Master — épreuves rédigées, cas pratiques",
   "ENSET":"École Normale Supérieure de l'Enseignement Technique — Master GEII, SID",
   "ENS Fès":"École Normale Supérieure de Fès — Master Enseignement",
-  "ENS Rabat":"École Normale Supérieure de Rabat — Master Enseignement"
+  "ENS Rabat":"École Normale Supérieure de Rabat — Master Enseignement",
+  "FS Agadir":"Faculté des Sciences d'Agadir — Masters scientifiques",
+  "FS Aïn Chock":"Faculté des Sciences Aïn Chock (Casablanca) — Masters scientifiques",
+  "FS Ben M'Sik":"Faculté des Sciences Ben M'Sik (Casablanca) — Masters scientifiques",
+  "FS El Jadida":"Faculté des Sciences d'El Jadida — Masters scientifiques",
+  "FS Fès":"Faculté des Sciences Dhar El Mahraz (Fès) — Masters scientifiques",
+  "FS Kénitra":"Faculté des Sciences de Kénitra — Masters scientifiques",
+  "FS Meknès":"Faculté des Sciences de Meknès — Masters scientifiques",
+  "FS Oujda":"Faculté des Sciences d'Oujda — Masters scientifiques",
+  "FS Rabat":"Faculté des Sciences de Rabat — Masters scientifiques",
+  "FS Tétouan":"Faculté des Sciences de Tétouan — Masters scientifiques",
+  "FSSM Marrakech":"Faculté des Sciences Semlalia (Marrakech) — Masters scientifiques",
+  "UM6P":"Université Mohammed VI Polytechnique — Master TIUF (Technologies Industrielles de l'Usine du Futur)"
 };
 function masterDesc(concours){ return MASTER_DESC[concours] || ""; }
 function masterConcoursOrder(){
