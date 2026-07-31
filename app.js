@@ -20,7 +20,7 @@ const prefersReducedMotion = () =>
 // rules (singular/dual/plural-3-10/plural-11+) — that's a known simplification, not a bug.
 const I18N = {
   fr: {
-    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", nav_bac2:"Concours Bac+2", skip_to_content:"Aller au contenu",
+    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", nav_bac2:"Concours Bac+2", nav_bac3:"Concours d'enseignement", skip_to_content:"Aller au contenu",
     search_placeholder:"Chercher un concours, une matière…",
     theme_to_dark:"Passer en mode sombre", theme_to_light:"Passer en mode clair",
     lang_to_ar:"Passer l'interface en arabe", lang_to_fr:"Passer l'interface en français",
@@ -84,6 +84,11 @@ const I18N = {
     bac2_placeholder:"Tape ta réponse ici…",
     bac2_check_similarity:"Vérifier ma similarité", bac2_reveal:"Voir la réponse et l'explication",
     bac2_reviewed:"consultées",
+    bac3_title:"Concours d'enseignement", bac3_badge:"Enseignement",
+    bac3_desc:"Concours de recrutement des enseignants — cycle primaire et secondaire, organisés par filière. QCM avec correction et explication détaillée.",
+    bac3_empty:"Aucune filière disponible pour le moment.",
+    bac3_cycle_primaire:"Primaire", bac3_cycle_secondaire:"Secondaire",
+    bac3_cycle_primaire_hint:"Enseignement primaire", bac3_cycle_secondaire_hint:"Enseignement secondaire",
     mode_cours_tag:"Mode cours", mode_cours_title:"Question par question",
     mode_cours_desc:"Avance à ton rythme, reviens en arrière, pas de chronomètre. Idéal pour découvrir les notions.",
     btn_start:"Commencer", mode_examen_tag:"Mode examen", mode_examen_title:"Chronométré",
@@ -110,7 +115,7 @@ const I18N = {
     comments_error:"Impossible de charger les commentaires.", comments_hidden_reported:"Commentaire masqué (signalé plusieurs fois).",
   },
   ar: {
-    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", nav_bac2:"مباريات Bac+2", skip_to_content:"الانتقال إلى المحتوى",
+    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", nav_bac2:"مباريات Bac+2", nav_bac3:"مباريات التعليم", skip_to_content:"الانتقال إلى المحتوى",
     search_placeholder:"ابحث عن مباراة أو مادة…",
     theme_to_dark:"التبديل إلى الوضع الداكن", theme_to_light:"التبديل إلى الوضع الفاتح",
     lang_to_ar:"التبديل إلى العربية", lang_to_fr:"التبديل إلى الفرنسية",
@@ -174,6 +179,11 @@ const I18N = {
     bac2_placeholder:"اكتب إجابتك هنا…",
     bac2_check_similarity:"تحقق من نسبة التشابه", bac2_reveal:"عرض الإجابة والشرح",
     bac2_reviewed:"تمت مراجعتها",
+    bac3_title:"مباريات التعليم", bac3_badge:"التعليم",
+    bac3_desc:"مباريات توظيف الأساتذة — السلك الابتدائي والإعدادي/التأهيلي، منظمة حسب الشعبة. أسئلة اختيار من متعدد مع تصحيح وشرح مفصل.",
+    bac3_empty:"لا توجد شعبة متوفرة حاليًا.",
+    bac3_cycle_primaire:"الابتدائي", bac3_cycle_secondaire:"الثانوي",
+    bac3_cycle_primaire_hint:"التعليم الابتدائي", bac3_cycle_secondaire_hint:"التعليم الثانوي",
     mode_cours_tag:"وضع المراجعة", mode_cours_title:"سؤال بسؤال",
     mode_cours_desc:"تقدم بالسرعة التي تناسبك، والرجوع للخلف ممكن، بدون توقيت. مثالي لاكتشاف المفاهيم.",
     btn_start:"ابدأ", mode_examen_tag:"وضع الامتحان", mode_examen_title:"محدد بوقت",
@@ -561,6 +571,53 @@ function saveBac2Progress(examId, data){
   try{ localStorage.setItem("suprepa:bac2progress:"+examId, JSON.stringify(data)); }catch(e){}
 }
 
+// ---------- Bac+3 (concours d'enseignement) — données et stockage séparés du reste ----------
+let BAC3_DB = [];
+const bac3QuestionsCache = new Map();
+const bac3AnswersCache = new Map();
+
+async function loadBac3Meta(){
+  const res = await fetch("/api/bac3-exams");
+  if (!res.ok) throw new Error("bac3 exams meta fetch failed");
+  BAC3_DB = await res.json();
+}
+async function loadBac3Questions(id){
+  if (bac3QuestionsCache.has(id)) return bac3QuestionsCache.get(id);
+  const res = await fetch("/api/bac3-exam?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("bac3 exam fetch failed");
+  const data = await res.json();
+  bac3QuestionsCache.set(id, data);
+  return data;
+}
+async function loadBac3Answers(id){
+  if (bac3AnswersCache.has(id)) return bac3AnswersCache.get(id);
+  const res = await fetch("/api/bac3-correction?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("bac3 correction fetch failed");
+  const data = await res.json();
+  bac3AnswersCache.set(id, data.answers);
+  return data.answers;
+}
+function loadBac3Progress(examId){
+  try{ return JSON.parse(localStorage.getItem("suprepa:bac3progress:"+examId)) || {}; }
+  catch(e){ return {}; }
+}
+function saveBac3Progress(examId, data){
+  try{ localStorage.setItem("suprepa:bac3progress:"+examId, JSON.stringify(data)); }catch(e){}
+}
+function bac3Cycles(){
+  const seen = [];
+  BAC3_DB.forEach(e => { if (!seen.includes(e.cycle)) seen.push(e.cycle); });
+  return seen;
+}
+function bac3FilieresOf(cycle){
+  const seen = [];
+  BAC3_DB.forEach(e => { if (e.cycle === cycle && !seen.includes(e.filiere)) seen.push(e.filiere); });
+  return seen;
+}
+function bac3ByFiliere(cycle, filiere){
+  return BAC3_DB.filter(e => e.cycle === cycle && e.filiere === filiere);
+}
+
 // Approximate self-check, not authoritative grading: two technically-correct answers
 // can be phrased very differently (especially for math/derivations), so this is a rough
 // word-overlap indicator to nudge self-assessment — always paired with a real reveal button.
@@ -857,6 +914,11 @@ function routeRank(parts){
     if (parts[1] === "exam") return 3; // bac2 session
     return 1;
   }
+  if (parts[0] === "bac3"){
+    if (parts.length === 1) return 1; // cycle picker
+    if (parts[1] === "exam") return 4; // session
+    return parts.length === 2 ? 2 : 3; // cycle -> filiere list
+  }
   return 0;
 }
 let lastRouteRank = null;
@@ -920,6 +982,11 @@ function route(){
   if (parts[0] === "bac2" && parts[1] === "concours" && parts.length === 3) return renderBac2Concours(parts[2]);
   if (parts[0] === "bac2" && parts[1] === "exam" && parts.length === 3) return renderBac2Session(parts[2]);
   if (parts[0] === "bac2" && parts[1] === "exam" && parts.length === 4) return renderBac2Session(parts[2], parseInt(parts[3], 10));
+  if (parts[0] === "bac3" && parts.length === 1) return renderBac3Home();
+  if (parts[0] === "bac3" && parts[1] === "exam" && parts.length === 3) return renderBac3Session(parts[2]);
+  if (parts[0] === "bac3" && parts[1] === "exam" && parts.length === 4) return renderBac3Session(parts[2], parseInt(parts[3], 10));
+  if (parts[0] === "bac3" && parts.length === 2) return renderBac3Cycle(parts[1]);
+  if (parts[0] === "bac3" && parts.length === 3) return renderBac3Filiere(parts[1], parts[2]);
   return renderHome();
 }
 
@@ -1657,6 +1724,179 @@ async function renderBac2Session(examId, startIdx){
       });
     }
 
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    if (prevBtn) prevBtn.addEventListener("click", async () => { if (state.idx>0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }});
+    if (nextBtn) nextBtn.addEventListener("click", async () => { if (state.idx<total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }});
+  }
+
+  await renderQuestion();
+}
+
+// ---------- Bac+3 (concours d'enseignement) — Primaire/Secondaire, puis filière ----------
+async function ensureBac3Loaded(retryFn){
+  if (BAC3_DB.length) return true;
+  app.innerHTML = skeletonRows(2);
+  try{ await loadBac3Meta(); return true; }
+  catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), retryFn); return false; }
+}
+
+async function renderBac3Home(){
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("bac3_title")}`);
+  if (!(await ensureBac3Loaded(renderBac3Home))) return;
+  const cycles = ["Primaire", "Secondaire"];
+  const cards = cycles.map(cy => {
+    const n = BAC3_DB.filter(e => e.cycle === cy).reduce((s,e)=>s+e.n,0);
+    const nFilieres = bac3FilieresOf(cy).length;
+    return `
+      <a class="card concours-card" href="#/bac3/${encodeURIComponent(cy.toLowerCase())}">
+        <span class="eyebrow">${cy === "Primaire" ? t("bac3_cycle_primaire_hint") : t("bac3_cycle_secondaire_hint")}</span>
+        <h3>${cy === "Primaire" ? t("bac3_cycle_primaire") : t("bac3_cycle_secondaire")}</h3>
+        <div class="meta">${nFilieres ? nMatieres(nFilieres) : t("bac3_empty")}</div>
+        <div class="count">${n}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
+      </a>`;
+  }).join("");
+  app.innerHTML = `
+    <div class="inedit-hero">
+      <span class="badge-original">${t("bac3_badge")}</span>
+      <div class="section-head" style="margin:12px 0 0;"><h2 style="margin:0;">${t("bac3_title")}</h2></div>
+      <p>${t("bac3_desc")}</p>
+    </div>
+    <div class="grid">${cards}</div>
+  `;
+}
+
+async function renderBac3Cycle(cycleSlug){
+  if (!(await ensureBac3Loaded(() => renderBac3Cycle(cycleSlug)))) return;
+  const cycle = cycleSlug.toLowerCase() === "primaire" ? "Primaire" : "Secondaire";
+  const cycleLabel = cycle === "Primaire" ? t("bac3_cycle_primaire") : t("bac3_cycle_secondaire");
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/bac3">${t("bac3_title")}</a> / ${cycleLabel}`);
+  const filieres = bac3FilieresOf(cycle);
+  if (!filieres.length){
+    app.innerHTML = `<a class="backlink" href="#/bac3">${backArrow()} ${t("bac3_title")}</a><div class="empty">${t("bac3_empty")}</div>`;
+    return;
+  }
+  const cards = filieres.map(fi => {
+    const exams = bac3ByFiliere(cycle, fi);
+    const n = exams.reduce((s,e)=>s+e.n,0);
+    const years = [...new Set(exams.map(e=>e.annee))].sort();
+    return `
+      <a class="card" href="#/bac3/${encodeURIComponent(cycleSlug.toLowerCase())}/${encodeURIComponent(fi)}">
+        <span class="eyebrow">${years[0]}${years.length>1?`–${years[years.length-1]}`:""}</span>
+        <h3>${escapeHtml(fi)}</h3>
+        <div class="meta">${nExamens(exams.length)} · ${nQuestions(n)}</div>
+      </a>`;
+  }).join("");
+  app.innerHTML = `
+    <a class="backlink" href="#/bac3">${backArrow()} ${t("bac3_title")}</a>
+    <div class="section-head"><h2>${cycleLabel}</h2></div>
+    <div class="grid">${cards}</div>
+  `;
+}
+
+async function renderBac3Filiere(cycleSlug, filiere){
+  if (!(await ensureBac3Loaded(() => renderBac3Filiere(cycleSlug, filiere)))) return;
+  const cycle = cycleSlug.toLowerCase() === "primaire" ? "Primaire" : "Secondaire";
+  const cycleLabel = cycle === "Primaire" ? t("bac3_cycle_primaire") : t("bac3_cycle_secondaire");
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/bac3">${t("bac3_title")}</a> / <a href="#/bac3/${encodeURIComponent(cycleSlug)}">${cycleLabel}</a> / ${escapeHtml(filiere)}`);
+  const exams = bac3ByFiliere(cycle, filiere);
+  const rows = exams.map(e => `
+    <div class="exam-row">
+      <div class="left">
+        <span class="year">${escapeHtml(e.annee)}</span>
+        <div>
+          <div style="font-weight:600;">${escapeHtml(filiere)}</div>
+          <div class="n">${nQuestions(e.n)}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="#/bac3/exam/${e.id}">${t("btn_open")}</a>
+      </div>
+    </div>`).join("");
+  app.innerHTML = `
+    <a class="backlink" href="#/bac3/${encodeURIComponent(cycleSlug)}">${backArrow()} ${cycleLabel}</a>
+    <div class="section-head"><h2>${escapeHtml(filiere)}</h2><span class="hint">${nExamens(exams.length)}</span></div>
+    ${rows || `<div class="empty">${t("empty_no_exam")}</div>`}
+  `;
+}
+
+async function renderBac3Session(examId, startIdx){
+  if (!BAC3_DB.length){
+    try{ await loadBac3Meta(); }catch(e){ /* meta below will 404 gracefully */ }
+  }
+  const meta = BAC3_DB.find(e => e.id === examId);
+  const cycleSlug = meta ? meta.cycle.toLowerCase() : "";
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/bac3">${t("bac3_title")}</a> / ${meta ? `<a href="#/bac3/${encodeURIComponent(cycleSlug)}/${encodeURIComponent(meta.filiere)}">${escapeHtml(meta.filiere)}</a>` : "…"}`);
+
+  app.innerHTML = skeletonQuestionCard();
+  let exam;
+  try{ exam = await loadBac3Questions(examId); }
+  catch(e){ app.innerHTML = retryBlock(t("err_load_exam"), () => renderBac3Session(examId, startIdx)); return; }
+
+  const progress = loadBac3Progress(examId);
+  const state = {
+    idx: (Number.isInteger(startIdx) && startIdx >= 0 && startIdx < exam.questions.length) ? startIdx : 0,
+    answers: progress.answers || {}
+  };
+  function persist(){
+    saveBac3Progress(examId, { answers: state.answers, updatedAt: Date.now() });
+  }
+
+  async function renderQuestion(){
+    const q = exam.questions[state.idx];
+    const total = exam.questions.length;
+    const selected = state.answers[state.idx];
+    const optionsHtml = q.options.map(o => {
+      let cls = "option";
+      if (selected && o.letter === selected) cls += " selected";
+      return `<button class="${cls}" data-letter="${o.letter}" ${selected ? "disabled" : ""}>
+        <span class="letter">${o.letter}</span><span>${escapeHtml(o.text)}</span>
+      </button>`;
+    }).join("");
+    let correctionHtml = "";
+    if (selected){
+      try{
+        const answers = await loadBac3Answers(examId);
+        const info = answers[state.idx];
+        const isRight = info && selected === info.correct;
+        correctionHtml = `
+          <div class="notice" style="border-color:${isRight? 'var(--green)':'var(--red)'};">
+            <b style="color:${isRight? 'var(--green)':'var(--red)'};">${isRight ? t("correct_answer_right") : t("correct_answer_wrong")} — ${currentLang === "ar" ? `الإجابة الصحيحة: ${info.correct}` : `réponse correcte : ${info.correct}`}</b>
+            ${info.explanation ? `<div style="margin-top:8px;">${escapeHtml(info.explanation)}</div>` : ""}
+          </div>`;
+      }catch(e){
+        correctionHtml = `<div class="notice">${t("err_load_exam")}</div>`;
+      }
+    }
+    app.innerHTML = `
+      <div class="session-head">
+        <div>
+          <div class="title">${meta ? escapeHtml(meta.filiere) : ""} ${meta ? `<span class="badge-original" style="margin-left:6px;">${t("bac3_badge")}</span>` : ""}</div>
+          <div class="sub">${currentLang === "ar" ? `${state.idx+1} من ${total}` : `Question ${state.idx+1} sur ${total}`}</div>
+        </div>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${(state.idx+1)/total*100}%"></div></div>
+      <div class="question-card">
+        <span class="qnum">${q.num}</span>
+        <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+        <div class="options">${optionsHtml}</div>
+        ${correctionHtml}
+      </div>
+      <div class="session-nav" style="margin-top:20px;">
+        <button class="btn" id="prevBtn" ${state.idx===0 ? "disabled":""}>${backArrow()} ${t("btn_prev")}</button>
+        <span class="mid">${Object.keys(state.answers).length} / ${total} ${currentLang === "ar" ? "تمت الإجابة عنها" : "répondues"}</span>
+        <button class="btn primary" id="nextBtn" ${state.idx===total-1 ? "disabled":""}>${t("btn_next")}</button>
+      </div>
+    `;
+    renderMath();
+    document.querySelectorAll(".option").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (state.answers[state.idx]) return;
+        state.answers[state.idx] = btn.dataset.letter;
+        persist();
+        await renderQuestion();
+      });
+    });
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     if (prevBtn) prevBtn.addEventListener("click", async () => { if (state.idx>0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }});
