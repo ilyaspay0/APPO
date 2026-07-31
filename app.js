@@ -20,7 +20,7 @@ const prefersReducedMotion = () =>
 // rules (singular/dual/plural-3-10/plural-11+) — that's a known simplification, not a bug.
 const I18N = {
   fr: {
-    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", nav_bac2:"Concours Bac+2", nav_bac3:"Concours d'enseignement", skip_to_content:"Aller au contenu",
+    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", nav_level:"Niveau ▾", nav_bac2:"Concours Bac+2", nav_bac3:"Concours d'enseignement", nav_master:"Concours Master", skip_to_content:"Aller au contenu",
     search_placeholder:"Chercher un concours, une matière…",
     theme_to_dark:"Passer en mode sombre", theme_to_light:"Passer en mode clair",
     lang_to_ar:"Passer l'interface en arabe", lang_to_fr:"Passer l'interface en français",
@@ -89,6 +89,8 @@ const I18N = {
     bac3_empty:"Aucune filière disponible pour le moment.",
     bac3_cycle_primaire:"Primaire", bac3_cycle_secondaire:"Secondaire",
     bac3_cycle_primaire_hint:"Enseignement primaire", bac3_cycle_secondaire_hint:"Enseignement secondaire",
+    master_title:"Concours Master", master_badge:"Master",
+    master_desc:"Concours d'admission en Master — ENCG, ENSET, ENS Fès, ENS Rabat. QCM et exercices à réponse rédigée selon les concours.",
     mode_cours_tag:"Mode cours", mode_cours_title:"Question par question",
     mode_cours_desc:"Avance à ton rythme, reviens en arrière, pas de chronomètre. Idéal pour découvrir les notions.",
     btn_start:"Commencer", mode_examen_tag:"Mode examen", mode_examen_title:"Chronométré",
@@ -115,7 +117,7 @@ const I18N = {
     comments_error:"Impossible de charger les commentaires.", comments_hidden_reported:"Commentaire masqué (signalé plusieurs fois).",
   },
   ar: {
-    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", nav_bac2:"مباريات Bac+2", nav_bac3:"مباريات التعليم", skip_to_content:"الانتقال إلى المحتوى",
+    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", nav_level:"المستوى ▾", nav_bac2:"مباريات Bac+2", nav_bac3:"مباريات التعليم", nav_master:"مباريات الماستر", skip_to_content:"الانتقال إلى المحتوى",
     search_placeholder:"ابحث عن مباراة أو مادة…",
     theme_to_dark:"التبديل إلى الوضع الداكن", theme_to_light:"التبديل إلى الوضع الفاتح",
     lang_to_ar:"التبديل إلى العربية", lang_to_fr:"التبديل إلى الفرنسية",
@@ -184,6 +186,8 @@ const I18N = {
     bac3_empty:"لا توجد شعبة متوفرة حاليًا.",
     bac3_cycle_primaire:"الابتدائي", bac3_cycle_secondaire:"الثانوي",
     bac3_cycle_primaire_hint:"التعليم الابتدائي", bac3_cycle_secondaire_hint:"التعليم الثانوي",
+    master_title:"مباريات الماستر", master_badge:"ماستر",
+    master_desc:"مباريات ولوج الماستر — ENCG، ENSET، المدرسة العليا للأساتذة بفاس والرباط. أسئلة اختيار من متعدد وتمارين بإجابة محررة حسب المباراة.",
     mode_cours_tag:"وضع المراجعة", mode_cours_title:"سؤال بسؤال",
     mode_cours_desc:"تقدم بالسرعة التي تناسبك، والرجوع للخلف ممكن، بدون توقيت. مثالي لاكتشاف المفاهيم.",
     btn_start:"ابدأ", mode_examen_tag:"وضع الامتحان", mode_examen_title:"محدد بوقت",
@@ -479,6 +483,23 @@ function bac2ConcoursOrder(){
 }
 function bac2ByConcours(concours){ return BAC2_DB.filter(e => e.concours === concours); }
 
+// Descriptions pour les concours Master (ENCG y existe aussi côté Bac et Bac+2 — c'est un
+// concours d'admission différent, donc une description dédiée plutôt que de réutiliser CONCOURS_DESC).
+const MASTER_DESC = {
+  "ENCG":"Concours d'admission en Master — épreuves rédigées, cas pratiques",
+  "ENSET":"École Normale Supérieure de l'Enseignement Technique — Master GEII, SID",
+  "ENS Fès":"École Normale Supérieure de Fès — Master Enseignement",
+  "ENS Rabat":"École Normale Supérieure de Rabat — Master Enseignement"
+};
+function masterDesc(concours){ return MASTER_DESC[concours] || ""; }
+function masterConcoursOrder(){
+  const seen = [];
+  MASTER_DB.forEach(e => { if (!seen.includes(e.concours)) seen.push(e.concours); });
+  return seen;
+}
+function masterByConcours(concours){ return MASTER_DB.filter(e => e.concours === concours); }
+
+
 function byConcours(concours){
   return EXAMS_DB.filter(e => e.concours === concours && e.source !== "suprepa");
 }
@@ -616,6 +637,40 @@ function bac3FilieresOf(cycle){
 }
 function bac3ByFiliere(cycle, filiere){
   return BAC3_DB.filter(e => e.cycle === cycle && e.filiere === filiere);
+}
+
+// ---------- Master (concours d'admission en Master) — données et stockage séparés ----------
+let MASTER_DB = [];
+const masterQuestionsCache = new Map();
+const masterAnswersCache = new Map();
+
+async function loadMasterMeta(){
+  const res = await fetch("/api/master-exams");
+  if (!res.ok) throw new Error("master exams meta fetch failed");
+  MASTER_DB = await res.json();
+}
+async function loadMasterQuestions(id){
+  if (masterQuestionsCache.has(id)) return masterQuestionsCache.get(id);
+  const res = await fetch("/api/master-exam?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("master exam fetch failed");
+  const data = await res.json();
+  masterQuestionsCache.set(id, data);
+  return data;
+}
+async function loadMasterAnswers(id){
+  if (masterAnswersCache.has(id)) return masterAnswersCache.get(id);
+  const res = await fetch("/api/master-correction?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("master correction fetch failed");
+  const data = await res.json();
+  masterAnswersCache.set(id, data.answers);
+  return data.answers;
+}
+function loadMasterProgress(examId){
+  try{ return JSON.parse(localStorage.getItem("suprepa:masterprogress:"+examId)) || {}; }
+  catch(e){ return {}; }
+}
+function saveMasterProgress(examId, data){
+  try{ localStorage.setItem("suprepa:masterprogress:"+examId, JSON.stringify(data)); }catch(e){}
 }
 
 // Approximate self-check, not authoritative grading: two technically-correct answers
@@ -919,6 +974,12 @@ function routeRank(parts){
     if (parts[1] === "exam") return 4; // session
     return parts.length === 2 ? 2 : 3; // cycle -> filiere list
   }
+  if (parts[0] === "master"){
+    if (parts.length === 1) return 1; // all master-concours listing
+    if (parts[1] === "concours") return 2; // master concours -> exams list
+    if (parts[1] === "exam") return 3; // master session
+    return 1;
+  }
   return 0;
 }
 let lastRouteRank = null;
@@ -987,6 +1048,10 @@ function route(){
   if (parts[0] === "bac3" && parts[1] === "exam" && parts.length === 4) return renderBac3Session(parts[2], parseInt(parts[3], 10));
   if (parts[0] === "bac3" && parts.length === 2) return renderBac3Cycle(parts[1]);
   if (parts[0] === "bac3" && parts.length === 3) return renderBac3Filiere(parts[1], parts[2]);
+  if (parts[0] === "master" && parts.length === 1) return renderMasterHome();
+  if (parts[0] === "master" && parts[1] === "concours" && parts.length === 3) return renderMasterConcours(parts[2]);
+  if (parts[0] === "master" && parts[1] === "exam" && parts.length === 3) return renderMasterSession(parts[2]);
+  if (parts[0] === "master" && parts[1] === "exam" && parts.length === 4) return renderMasterSession(parts[2], parseInt(parts[3], 10));
   return renderHome();
 }
 
@@ -1016,6 +1081,20 @@ function bac2ConcoursCardHtml(c){
       <span class="eyebrow">${typeLabel}</span>
       <h3>${c}</h3>
       <div class="meta">${bac2Desc(c)}</div>
+      <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
+    </a>`;
+}
+function masterConcoursCardHtml(c){
+  const exams = masterByConcours(c);
+  const q = exams.reduce((s,e)=>s+e.n,0);
+  const hasQcm = exams.some(e => e.type === "qcm");
+  const hasLibre = exams.some(e => e.type !== "qcm");
+  const typeLabel = hasQcm && hasLibre ? `${t("bac2_type_qcm")} + ${t("bac2_free_response")}` : hasQcm ? t("bac2_type_qcm") : t("bac2_free_response");
+  return `
+    <a class="card concours-card" href="#/master/concours/${encodeURIComponent(c)}">
+      <span class="eyebrow">${typeLabel}</span>
+      <h3>${c}</h3>
+      <div class="meta">${masterDesc(c)}</div>
       <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
     </a>`;
 }
@@ -1574,6 +1653,53 @@ async function renderBac2Concours(concours){
   `;
 }
 
+async function renderMasterHome(){
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("master_title")}`);
+  if (!MASTER_DB.length){
+    app.innerHTML = skeletonRows(3);
+    try{ await loadMasterMeta(); }
+    catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), renderMasterHome); return; }
+  }
+  const list = masterConcoursOrder();
+  const cards = list.map(masterConcoursCardHtml).join("");
+  app.innerHTML = `
+    <div class="inedit-hero">
+      <span class="badge-original">${t("master_badge")}</span>
+      <div class="section-head" style="margin:12px 0 0;"><h2 style="margin:0;">${t("master_title")}</h2></div>
+      <p>${t("master_desc")}</p>
+    </div>
+    ${cards ? `<div class="grid">${cards}</div>` : `<div class="empty">${t("bac2_empty")}</div>`}
+  `;
+}
+
+async function renderMasterConcours(concours){
+  if (!MASTER_DB.length){
+    app.innerHTML = skeletonRows(3);
+    try{ await loadMasterMeta(); }
+    catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), () => renderMasterConcours(concours)); return; }
+  }
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/master">${t("master_title")}</a> / ${escapeHtml(concours)}`);
+  const exams = masterByConcours(concours);
+  const rows = exams.map(e => `
+    <div class="exam-row">
+      <div class="left">
+        <span class="year">${escapeHtml(e.annee)}</span>
+        <div>
+          <div style="font-weight:600;">${escapeHtml(e.matiere)}</div>
+          <div class="n">${nQuestions(e.n)} · ${e.type === "qcm" ? t("bac2_type_qcm") : t("bac2_free_response")}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="#/master/exam/${e.id}">${t("btn_open")}</a>
+      </div>
+    </div>`).join("");
+  app.innerHTML = `
+    <a class="backlink" href="#/master">${backArrow()} ${t("master_title")}</a>
+    <div class="section-head"><h2>${escapeHtml(concours)}</h2><span class="hint">${masterDesc(concours)}</span></div>
+    ${rows || `<div class="empty">${t("empty_no_exam")}</div>`}
+  `;
+}
+
 async function renderBac2Session(examId, startIdx){
   if (!BAC2_DB.length){
     try{ await loadBac2Meta(); }catch(e){ /* exam meta below will 404 gracefully */ }
@@ -1718,6 +1844,166 @@ async function renderBac2Session(examId, startIdx){
         await renderQuestion();
       });
       document.getElementById("bac2RevealBtn").addEventListener("click", async () => {
+        state.revealed[state.idx] = true;
+        persist();
+        await renderQuestion();
+      });
+    }
+
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    if (prevBtn) prevBtn.addEventListener("click", async () => { if (state.idx>0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }});
+    if (nextBtn) nextBtn.addEventListener("click", async () => { if (state.idx<total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }});
+  }
+
+  await renderQuestion();
+}
+
+// ---------- Master session (adapté de Bac+2 : QCM ou réponse libre selon exam.type) ----------
+async function renderMasterSession(examId, startIdx){
+  if (!MASTER_DB.length){
+    try{ await loadMasterMeta(); }catch(e){ /* exam meta below will 404 gracefully */ }
+  }
+  const meta = MASTER_DB.find(e => e.id === examId);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/master">${t("master_title")}</a> / ${meta ? `<a href="#/master/concours/${encodeURIComponent(meta.concours)}">${escapeHtml(meta.concours)}</a>` : "…"}`);
+
+  app.innerHTML = skeletonQuestionCard();
+  let exam;
+  try{ exam = await loadMasterQuestions(examId); }
+  catch(e){ app.innerHTML = retryBlock(t("err_load_exam"), () => renderMasterSession(examId, startIdx)); return; }
+
+  const progress = loadMasterProgress(examId);
+  const state = {
+    idx: (Number.isInteger(startIdx) && startIdx >= 0 && startIdx < exam.questions.length) ? startIdx : 0,
+    drafts: progress.drafts || {},
+    revealed: progress.revealed || {},
+    answers: progress.answers || {}
+  };
+  const isQcm = exam.type === "qcm";
+
+  function persist(){
+    saveMasterProgress(examId, { drafts: state.drafts, revealed: state.revealed, answers: state.answers, updatedAt: Date.now() });
+  }
+
+  async function renderQuestion(){
+    const q = exam.questions[state.idx];
+    const total = exam.questions.length;
+
+    if (isQcm){
+      const selected = state.answers[state.idx];
+      let optionsHtml = q.options.map(o => {
+        let cls = "option";
+        if (selected){
+          if (o.letter === selected) cls += " selected";
+        }
+        return `<button class="${cls}" data-letter="${o.letter}" ${selected ? "disabled" : ""}>
+          <span class="letter">${o.letter}</span><span>${escapeHtml(o.text)}</span>
+        </button>`;
+      }).join("");
+      let correctionHtml = "";
+      if (selected){
+        try{
+          const answers = await loadMasterAnswers(examId);
+          const info = answers[state.idx];
+          const isRight = info && selected === info.correct;
+          correctionHtml = `
+            <div class="notice" style="border-color:${isRight? 'var(--green)':'var(--red)'};">
+              <b style="color:${isRight? 'var(--green)':'var(--red)'};">${isRight ? t("correct_answer_right") : t("correct_answer_wrong")} — ${currentLang === "ar" ? `الإجابة الصحيحة: ${info.correct}` : `réponse correcte : ${info.correct}`}</b>
+              ${info.explanation ? `<div style="margin-top:8px;">${escapeHtml(info.explanation)}</div>` : ""}
+            </div>`;
+        }catch(e){
+          correctionHtml = `<div class="notice">${t("err_load_exam")}</div>`;
+        }
+      }
+      app.innerHTML = `
+        <div class="session-head">
+          <div>
+            <div class="title">${meta ? escapeHtml(meta.concours) : ""} ${meta ? `<span class="badge-original" style="margin-left:6px;">${t("master_badge")}</span>` : ""}</div>
+            <div class="sub">${currentLang === "ar" ? `${state.idx+1} من ${total}` : `Question ${state.idx+1} sur ${total}`}</div>
+          </div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${(state.idx+1)/total*100}%"></div></div>
+        <div class="question-card">
+          <span class="qnum">${q.num}</span>
+          <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+          <div class="options">${optionsHtml}</div>
+          ${correctionHtml}
+        </div>
+        <div class="session-nav" style="margin-top:20px;">
+          <button class="btn" id="prevBtn" ${state.idx===0 ? "disabled":""}>${backArrow()} ${t("btn_prev")}</button>
+          <span class="mid">${Object.keys(state.answers).length} / ${total} ${currentLang === "ar" ? "تمت الإجابة عنها" : "répondues"}</span>
+          <button class="btn primary" id="nextBtn" ${state.idx===total-1 ? "disabled":""}>${t("btn_next")}</button>
+        </div>
+      `;
+      renderMath();
+      document.querySelectorAll(".option").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          if (state.answers[state.idx]) return;
+          state.answers[state.idx] = btn.dataset.letter;
+          persist();
+          await renderQuestion();
+        });
+      });
+    } else {
+      const draft = state.drafts[state.idx] || "";
+      const isRevealed = !!state.revealed[state.idx];
+      let answerHtml = "";
+      if (isRevealed){
+        try{
+          const answers = await loadMasterAnswers(examId);
+          const modelAnswer = (answers[state.idx] && answers[state.idx].answer) || "";
+          const sim = draft.trim() ? textSimilarity(draft, modelAnswer) : null;
+          answerHtml = `
+            <div class="notice" style="border-color:var(--green);">
+              ${sim !== null ? `<div style="margin-bottom:8px;"><b>${t("bac2_similarity")} : ${sim}%</b> <span style="color:var(--ink-soft); font-size:12.5px;">(${t("bac2_similarity_hint")})</span></div>` : ""}
+              <b style="color:var(--green);">${t("bac2_model_answer")}</b>
+              <div style="margin-top:8px; white-space:pre-wrap;">${escapeHtml(modelAnswer)}</div>
+            </div>`;
+        }catch(e){
+          answerHtml = `<div class="notice">${t("err_load_exam")}</div>`;
+        }
+      }
+
+      app.innerHTML = `
+        <div class="session-head">
+          <div>
+            <div class="title">${meta ? escapeHtml(meta.concours) : ""} ${meta ? `<span class="badge-original" style="margin-left:6px;">${t("master_badge")}</span>` : ""}</div>
+            <div class="sub">${currentLang === "ar" ? `${state.idx+1} من ${total}` : `Question ${state.idx+1} sur ${total}`}</div>
+          </div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${(state.idx+1)/total*100}%"></div></div>
+
+        <div class="question-card">
+          <span class="qnum">${q.num}</span>
+          <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+          <textarea id="masterAnswer" rows="6" placeholder="${escapeHtml(t("bac2_placeholder"))}"
+            style="width:100%; font-family:var(--font-body); font-size:14.5px; padding:14px; border-radius:var(--radius); border:1px solid var(--line); background:var(--paper); color:var(--ink); resize:vertical;">${escapeHtml(draft)}</textarea>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+            <button class="btn" id="masterCheckBtn">${t("bac2_check_similarity")}</button>
+            <button class="btn gold" id="masterRevealBtn">${t("bac2_reveal")}</button>
+          </div>
+          ${answerHtml}
+        </div>
+
+        <div class="session-nav" style="margin-top:20px;">
+          <button class="btn" id="prevBtn" ${state.idx===0 ? "disabled":""}>${backArrow()} ${t("btn_prev")}</button>
+          <span class="mid">${Object.keys(state.revealed).length} / ${total} ${t("bac2_reviewed")}</span>
+          <button class="btn primary" id="nextBtn" ${state.idx===total-1 ? "disabled":""}>${t("btn_next")}</button>
+        </div>
+      `;
+      renderMath();
+
+      const textarea = document.getElementById("masterAnswer");
+      textarea.addEventListener("input", () => {
+        state.drafts[state.idx] = textarea.value;
+        persist();
+      });
+      document.getElementById("masterCheckBtn").addEventListener("click", async () => {
+        state.revealed[state.idx] = true;
+        persist();
+        await renderQuestion();
+      });
+      document.getElementById("masterRevealBtn").addEventListener("click", async () => {
         state.revealed[state.idx] = true;
         persist();
         await renderQuestion();
@@ -2386,6 +2672,27 @@ boot();
   });
   results.addEventListener("click", () => { results.classList.remove("open"); input.value=""; });
   input.addEventListener("keydown", (e) => { if (e.key === "Escape"){ input.blur(); results.classList.remove("open"); } });
+})();
+
+// ---------- Level dropdown (Bac / Bac+2 / Bac+3) ----------
+(function initLevelDropdown(){
+  const btn = document.getElementById("levelDropdownBtn");
+  const menu = document.getElementById("levelDropdownMenu");
+  if (!btn || !menu) return;
+  function closeMenu(){
+    menu.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+  }
+  function openMenu(){
+    menu.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+  }
+  btn.addEventListener("click", () => { menu.hidden ? openMenu() : closeMenu(); });
+  document.addEventListener("click", (e) => {
+    if (!menu.hidden && !menu.contains(e.target) && e.target !== btn) closeMenu();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+  menu.querySelectorAll("a").forEach(a => a.addEventListener("click", closeMenu));
 })();
 
 // ---------- Offline support ----------

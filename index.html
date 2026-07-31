@@ -310,6 +310,18 @@
   .search-results a:hover{ background:var(--paper); }
   .search-results .sr-meta{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); }
   .search-empty{ padding:14px; font-size:13px; color:var(--ink-soft); text-align:center; }
+  .level-dropdown{ position:relative; }
+  .level-dropdown-btn{ display:flex; align-items:center; gap:4px; cursor:pointer; }
+  .level-dropdown-menu{
+    position:absolute; top:calc(100% + 8px); left:0; min-width:220px;
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow);
+    z-index:50; overflow:hidden;
+  }
+  .level-dropdown-menu[hidden]{ display:none; }
+  .level-dropdown-menu a{ display:block; padding:11px 16px; font-size:13px; font-weight:600; color:var(--ink); border-bottom:1px solid var(--line); }
+  .level-dropdown-menu a:last-child{ border-bottom:none; }
+  .level-dropdown-menu a:hover{ background:var(--paper); color:var(--gold-deep); }
+  html[dir="rtl"] .level-dropdown-menu{ left:auto; right:0; }
   .theme-toggle{
     width:44px; height:44px; border-radius:50%; flex-shrink:0;
     border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.14); color:#fff;
@@ -882,8 +894,15 @@
     <div class="topbar-right">
       <a class="nav-link" href="#/inedit" data-i18n="nav_inedit">Questions inédites</a>
       <a class="nav-link" href="#/progression" data-i18n="nav_progression">Ma progression</a>
-      <a class="nav-link" href="#/bac2" data-i18n="nav_bac2">Concours Bac+2</a>
-      <a class="nav-link" href="#/bac3" data-i18n="nav_bac3">Concours d'enseignement</a>
+      <div class="level-dropdown">
+        <button class="nav-link level-dropdown-btn" id="levelDropdownBtn" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="nav_level">Niveau ▾</button>
+        <div class="level-dropdown-menu" id="levelDropdownMenu" hidden>
+          <a href="#/concours" data-i18n="level_bac">Bac</a>
+          <a href="#/bac2" data-i18n="nav_bac2">Concours Bac+2</a>
+          <a href="#/bac3" data-i18n="nav_bac3">Concours d'enseignement</a>
+          <a href="#/master" data-i18n="nav_master">Concours Master</a>
+        </div>
+      </div>
       <div id="authArea"></div>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Changer de thème" title="Changer de thème"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <button class="lang-toggle" id="langToggle" type="button" aria-label="Passer l'interface en arabe" title="FR / AR">
@@ -918,6 +937,7 @@
           <li><a href="#/progression" data-i18n="nav_progression">Ma progression</a></li>
           <li><a href="#/bac2" data-i18n="nav_bac2">Concours Bac+2</a></li>
           <li><a href="#/bac3" data-i18n="nav_bac3">Concours d'enseignement</a></li>
+          <li><a href="#/master" data-i18n="nav_master">Concours Master</a></li>
           <li><a href="#concours-grid" data-i18n="footer_choose_concours">Choisir un concours</a></li>
           <li><a href="#faq" data-i18n="footer_faq">Questions fréquentes</a></li>
         </ul>
