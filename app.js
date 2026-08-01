@@ -501,7 +501,11 @@ const MASTER_DESC = {
   "FS Rabat":"Faculté des Sciences de Rabat — Masters scientifiques",
   "FS Tétouan":"Faculté des Sciences de Tétouan — Masters scientifiques",
   "FSSM Marrakech":"Faculté des Sciences Semlalia (Marrakech) — Masters scientifiques",
-  "UM6P":"Université Mohammed VI Polytechnique — Master TIUF (Technologies Industrielles de l'Usine du Futur)"
+  "UM6P":"Université Mohammed VI Polytechnique — Master TIUF (Technologies Industrielles de l'Usine du Futur)",
+  "ENSAM":"École Nationale Supérieure d'Arts et Métiers — Masters Big Data & IoT, Mécanique, MIT & MIDMS",
+  "ENSA":"École Nationale des Sciences Appliquées — Masters SSI, 2ITN",
+  "ENSIAS":"École Nationale Supérieure d'Informatique et d'Analyse des Systèmes — Master SDBD",
+  "INSEA":"Institut National de Statistique et d'Économie Appliquée — Master M2SI"
 };
 function masterDesc(concours){ return MASTER_DESC[concours] || ""; }
 function masterConcoursOrder(){
