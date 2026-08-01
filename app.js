@@ -48,7 +48,7 @@ const I18N = {
     cover_status:"Statut", cover_ready:"Prêt",
     stat_questions:"Questions", stat_exams:"Examens", stat_concours:"Concours", stat_corrected:"Corrigées",
     section_choose_concours:"Choisis ton concours", section_resume:"Reprendre mes révisions", see_all:"Voir tout",
-    level_bac:"Bac", level_bac2:"Bac+2",
+    level_bac:"Bac", level_bac2:"Bac+2", level_bac3:"Bac+3", level_master:"Master",
     section_why:"Pourquoi Suprepa ?",
     feature_free_title:"100% gratuit", feature_free_desc:"Toute la banque de QCM est accessible librement, sans compte obligatoire et sans frais cachés.",
     feature_corrections_title:"Corrections détaillées", feature_corrections_desc:"Chaque question corrigée est accompagnée d'une explication claire : la bonne réponse, et pourquoi les autres sont fausses.",
@@ -145,7 +145,7 @@ const I18N = {
     cover_status:"الحالة", cover_ready:"جاهز",
     stat_questions:"الأسئلة", stat_exams:"الامتحانات", stat_concours:"المباريات", stat_corrected:"المصححة",
     section_choose_concours:"اختر مباراتك", section_resume:"استئناف مراجعتي", see_all:"عرض الكل",
-    level_bac:"البكالوريا", level_bac2:"Bac+2",
+    level_bac:"البكالوريا", level_bac2:"Bac+2", level_bac3:"Bac+3", level_master:"ماستر",
     section_why:"لماذا Suprepa؟",
     feature_free_title:"مجاني 100%", feature_free_desc:"بنك الأسئلة بأكمله متاح مجانًا، بدون حساب إلزامي وبدون أي رسوم خفية.",
     feature_corrections_title:"تصحيحات مفصّلة", feature_corrections_desc:"كل سؤال مصحح مرفق بشرح واضح: الجواب الصحيح، وسبب خطأ الأجوبة الأخرى.",
@@ -1121,24 +1121,56 @@ function concoursPickerBodyHtml(){
     return `<div class="grid">${sample}</div>
       ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/concours">${t("see_all")} (${list.length})</a></div>` : ""}`;
   }
-  if (!BAC2_DB.length){
-    return skeletonRows(2);
+  if (homeLevel === "bac2"){
+    if (!BAC2_DB.length) return skeletonRows(2);
+    const list = bac2ConcoursOrder();
+    const sample = list.slice(0, 5).map(bac2ConcoursCardHtml).join("");
+    return `<div class="grid">${sample}</div>
+      ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/bac2">${t("see_all")} (${list.length})</a></div>` : ""}`;
   }
-  const list = bac2ConcoursOrder();
-  const sample = list.slice(0, 5).map(bac2ConcoursCardHtml).join("");
+  if (homeLevel === "bac3"){
+    if (!BAC3_DB.length) return skeletonRows(2);
+    const cycles = ["Primaire", "Secondaire"];
+    const cards = cycles.map(cy => {
+      const n = BAC3_DB.filter(e => e.cycle === cy).reduce((s,e)=>s+e.n,0);
+      const nFilieres = bac3FilieresOf(cy).length;
+      return `
+        <a class="card concours-card" href="#/bac3/${encodeURIComponent(cy.toLowerCase())}">
+          <span class="eyebrow">${cy === "Primaire" ? t("bac3_cycle_primaire_hint") : t("bac3_cycle_secondaire_hint")}</span>
+          <h3>${cy === "Primaire" ? t("bac3_cycle_primaire") : t("bac3_cycle_secondaire")}</h3>
+          <div class="meta">${nFilieres ? nMatieres(nFilieres) : t("bac3_empty")}</div>
+          <div class="count">${n}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
+        </a>`;
+    }).join("");
+    return `<div class="grid">${cards}</div>`;
+  }
+  // master
+  if (!MASTER_DB.length) return skeletonRows(2);
+  const list = masterConcoursOrder();
+  const sample = list.slice(0, 5).map(masterConcoursCardHtml).join("");
   return `<div class="grid">${sample}</div>
-    ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/bac2">${t("see_all")} (${list.length})</a></div>` : ""}`;
+    ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/master">${t("see_all")} (${list.length})</a></div>` : ""}`;
 }
 function concoursPickerHtml(){
+  const tabs = [
+    ["bac", t("level_bac")],
+    ["bac2", t("level_bac2")],
+    ["bac3", t("level_bac3")],
+    ["master", t("level_master")]
+  ];
   return `
     <div class="section-head" id="concours-grid">
       <h2>${t("section_choose_concours")}</h2>
       <div class="level-tabs" role="tablist">
-        <button class="level-tab ${homeLevel==='bac'?'active':''}" data-level="bac" role="tab" aria-selected="${homeLevel==='bac'}">${t("level_bac")}</button>
-        <button class="level-tab ${homeLevel==='bac2'?'active':''}" data-level="bac2" role="tab" aria-selected="${homeLevel==='bac2'}">${t("level_bac2")}</button>
+        ${tabs.map(([key, label]) => `<button class="level-tab ${homeLevel===key?'active':''}" data-level="${key}" role="tab" aria-selected="${homeLevel===key}">${label}</button>`).join("")}
       </div>
     </div>
     <div id="concoursPickerBody">${concoursPickerBodyHtml()}</div>`;
+}
+async function loadLevelDataIfNeeded(level){
+  if (level === "bac2" && !BAC2_DB.length){ try{ await loadBac2Meta(); }catch(e){} }
+  if (level === "bac3" && !BAC3_DB.length){ try{ await loadBac3Meta(); }catch(e){} }
+  if (level === "master" && !MASTER_DB.length){ try{ await loadMasterMeta(); }catch(e){} }
 }
 function wireConcoursPicker(){
   document.querySelectorAll(".level-tab").forEach(btn => {
@@ -1150,9 +1182,10 @@ function wireConcoursPicker(){
         b.setAttribute("aria-selected", b.dataset.level === homeLevel);
       });
       const body = document.getElementById("concoursPickerBody");
-      if (homeLevel === "bac2" && !BAC2_DB.length){
+      const needsLoad = (homeLevel === "bac2" && !BAC2_DB.length) || (homeLevel === "bac3" && !BAC3_DB.length) || (homeLevel === "master" && !MASTER_DB.length);
+      if (needsLoad){
         body.innerHTML = skeletonRows(2);
-        try{ await loadBac2Meta(); }catch(e){ /* falls back to empty state below */ }
+        await loadLevelDataIfNeeded(homeLevel);
       }
       body.innerHTML = concoursPickerBodyHtml();
     });

@@ -398,12 +398,19 @@
 
   /* ---------- Section headers ---------- */
   .section-head{ display:flex; align-items:baseline; justify-content:space-between; margin:48px 0 18px;}
-  .level-tabs{ display:flex; gap:6px; background:var(--paper); border:1px solid var(--line); border-radius:20px; padding:3px; }
-  .level-tab{
-    font-family:var(--font-mono); font-size:12px; font-weight:600; padding:6px 16px; border-radius:16px;
-    color:var(--ink-soft); background:transparent; min-height:32px;
+  .level-tabs{
+    display:flex; gap:4px; background:var(--paper); border:1px solid var(--line); border-radius:20px; padding:3px;
+    overflow-x:auto; scrollbar-width:none; max-width:100%;
   }
-  .level-tab.active{ background:var(--ink); color:#fff; }
+  .level-tabs::-webkit-scrollbar{ display:none; }
+  .level-tab{
+    font-family:var(--font-mono); font-size:12px; font-weight:600; padding:6px 13px; border-radius:16px;
+    color:var(--ink-soft); background:transparent; min-height:32px; white-space:nowrap; flex-shrink:0;
+    transition:background-color .15s ease, color .15s ease;
+  }
+  .level-tab:hover{ color:var(--ink); }
+  .level-tab.active{ background:var(--ink); color:#fff; box-shadow:0 1px 3px rgba(15,42,74,.25); }
+  .level-tab.active:hover{ color:#fff; }
   .section-head h2{ font-family:var(--font-display); font-size:24px; margin:0; font-weight:600;}
   .section-head .hint{ font-size:13px; color:var(--ink-soft); font-family:var(--font-mono);}
 
