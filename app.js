@@ -2922,7 +2922,9 @@ boot();
   const btn = document.getElementById("levelDropdownBtn");
   const menu = document.getElementById("levelDropdownMenu");
   if (!btn || !menu) return;
+
   function closeMenu(){
+    if (menu.hidden) return;
     menu.hidden = true;
     btn.setAttribute("aria-expanded", "false");
   }
@@ -2930,12 +2932,34 @@ boot();
     menu.hidden = false;
     btn.setAttribute("aria-expanded", "true");
   }
-  btn.addEventListener("click", () => { menu.hidden ? openMenu() : closeMenu(); });
-  document.addEventListener("click", (e) => {
-    if (!menu.hidden && !menu.contains(e.target) && e.target !== btn) closeMenu();
+  function toggleMenu(e){
+    e.preventDefault();
+    e.stopPropagation();
+    menu.hidden ? openMenu() : closeMenu();
+  }
+
+  // pointerdown is more reliable than click on mobile (no 300ms / double-fire quirks)
+  btn.addEventListener("pointerdown", toggleMenu);
+  // Keep keyboard activation
+  btn.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); toggleMenu(e); }
+    if (e.key === "ArrowDown"){ e.preventDefault(); openMenu(); menu.querySelector("a")?.focus(); }
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
-  menu.querySelectorAll("a").forEach(a => a.addEventListener("click", closeMenu));
+
+  // Close on outside press — use contains() so clicks on the chevron/label still count as the button
+  document.addEventListener("pointerdown", (e) => {
+    if (menu.hidden) return;
+    if (menu.contains(e.target) || btn.contains(e.target)) return;
+    closeMenu();
+  }, true);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeMenu();
+  });
+
+  menu.querySelectorAll("a").forEach(a => {
+    a.addEventListener("click", () => closeMenu());
+  });
 })();
 
 // ---------- Offline support ----------
