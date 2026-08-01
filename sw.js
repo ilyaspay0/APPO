@@ -2,7 +2,7 @@
 //
 // CACHE_VERSION must change on every deploy that alters index.html, app.js, or
 // any shell asset. Prefer a build stamp (git short SHA / ISO date) so you never forget.
-const CACHE_VERSION = "suprepa-v3-perf-2026-08-01";
+const CACHE_VERSION = "suprepa-v3-mobile-2026-08-01";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 

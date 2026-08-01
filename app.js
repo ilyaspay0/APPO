@@ -2962,6 +2962,71 @@ boot();
   });
 })();
 
+
+// ---------- Mobile tab bar + niveau bottom sheet ----------
+(function initMobileChrome(){
+  const tabbar = document.getElementById("mobileTabbar");
+  const sheet = document.getElementById("mobileLevelSheet");
+  const levelBtn = document.getElementById("mobileLevelBtn");
+  if (!tabbar) return;
+
+  function currentTab(){
+    const h = (location.hash || "#/").replace(/^#\/?/, "");
+    const root = h.split("/")[0] || "";
+    if (!root) return "home";
+    if (root === "concours" || root === "exam") return "concours";
+    if (root === "inedit") return "inedit";
+    if (root === "progression" || root === "mistakes") return "progress";
+    if (root === "bac2" || root === "bac3" || root === "master") return "concours";
+    return "home";
+  }
+
+  function paintTabs(){
+    const tab = currentTab();
+    tabbar.querySelectorAll(".tabbar-item[data-tab]").forEach(el => {
+      const on = el.getAttribute("data-tab") === tab;
+      el.classList.toggle("active", on);
+      if (on) el.setAttribute("aria-current", "page");
+      else el.removeAttribute("aria-current");
+    });
+  }
+
+  function openSheet(){
+    if (!sheet) return;
+    sheet.hidden = false;
+    if (levelBtn) levelBtn.setAttribute("aria-expanded", "true");
+    document.body.style.overflow = "hidden";
+  }
+  function closeSheet(){
+    if (!sheet) return;
+    sheet.hidden = true;
+    if (levelBtn) levelBtn.setAttribute("aria-expanded", "false");
+    document.body.style.overflow = "";
+  }
+
+  if (levelBtn){
+    levelBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sheet && !sheet.hidden ? closeSheet() : openSheet();
+    });
+  }
+  if (sheet){
+    sheet.querySelectorAll("[data-close-sheet]").forEach(el => {
+      el.addEventListener("click", closeSheet);
+    });
+    sheet.querySelectorAll(".sheet-link").forEach(a => {
+      a.addEventListener("click", () => closeSheet());
+    });
+  }
+
+  window.addEventListener("hashchange", () => {
+    paintTabs();
+    closeSheet();
+  });
+  paintTabs();
+})();
+
 // ---------- Offline support ----------
 // Registered after "load" so it never competes with the initial page render for
 // bandwidth/priority. A previously-opened exam stays reviewable with no connection —
