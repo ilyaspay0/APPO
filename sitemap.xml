@@ -5,7 +5,6 @@
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-<<<<<<< HEAD
   <url>
     <loc>https://suprepa.com/#/concours</loc>
     <changefreq>weekly</changefreq>
@@ -256,6 +255,4 @@
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
-=======
->>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
 </urlset>

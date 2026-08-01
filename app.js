@@ -714,7 +714,6 @@ function loadProgress(examId){
 }
 function saveProgress(examId, data){
   try{ localStorage.setItem("prepari:progress:"+examId, JSON.stringify(data)); }catch(e){}
-<<<<<<< HEAD
   // Feed spaced-review queue whenever progress is saved with answers.
   try{ updateSpacedFromProgress(examId, data); }catch(e){}
   try{ touchStudyActivity(); }catch(e){}
@@ -878,9 +877,6 @@ function wireLearningDashboard(){
 // Cloud push hook kept on saveProgress via scheduleCloudPush(examId, data) — see below.
 function _saveProgressCloudHook(examId, data){
   try{ scheduleCloudPush(examId, data); }catch(e){}
-=======
-  scheduleCloudPush(examId, data);
->>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
 }
 function allProgress(){
   const out = [];
@@ -1471,18 +1467,13 @@ function renderHome(){
       </div>
     </section>
 
-<<<<<<< HEAD
     <div class="stat-strip" role="group" aria-label="${t("stat_questions")}">
-=======
-    <div class="stat-strip">
->>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
       <div class="stat-cell"><b>${totalQ.toLocaleString("fr-FR")}</b><span>${t("stat_questions")}</span></div>
       <div class="stat-cell"><b>${totalExams}</b><span>${t("stat_exams")}</span></div>
       <div class="stat-cell"><b>${nConcours}</b><span>${t("stat_concours")}</span></div>
       <div class="stat-cell"><b>${totalCorrected.toLocaleString("fr-FR")}</b><span>${t("stat_corrected")}</span></div>
     </div>
 
-<<<<<<< HEAD
     ${learningDashboardHtml()}
 
     <div class="section-head"><h2>${currentLang === "ar" ? "اختر مستواك" : "Choisis ton niveau"}</h2></div>
@@ -1513,8 +1504,6 @@ function renderHome(){
       </a>
     </div>
 
-=======
->>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
     ${concoursPickerHtml()}
     ${resumeHtml}
     ${featuresHtml}
@@ -1523,10 +1512,7 @@ function renderHome(){
     </div>
   `;
   wireConcoursPicker();
-<<<<<<< HEAD
   wireLearningDashboard();
-=======
->>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
   initScrollReveal();
 }
 
@@ -2643,7 +2629,6 @@ async function renderSession(examId, mode, startIdx){
       if (state.reviewMode && mode === "examen") return; // read-only review of a timed exam
       state.answers[state.idx] = letter;
       persist();
-<<<<<<< HEAD
       // Spaced repetition: schedule based on correctness when correction is known
       try{
         const corrections = await ensureCorrections();
@@ -2652,8 +2637,6 @@ async function renderSession(examId, mode, startIdx){
           scheduleReview(examId, state.idx, letter === c.correct ? 1 : 0);
         }
       }catch(e){}
-=======
->>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
       // Retour visuel immédiat : si une correction va être révélée (mode cours),
       // l'appel réseau peut prendre un instant — on ne laisse jamais l'écran figé sans rien.
       const willFetchCorrection = mode === "cours";
@@ -2969,7 +2952,6 @@ boot();
 if ("serviceWorker" in navigator){
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
-<<<<<<< HEAD
     // New deploy → new CACHE_VERSION → user gets a lightweight toast to refresh
     let refreshing = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
@@ -2987,7 +2969,5 @@ if ("serviceWorker" in navigator){
       bar.querySelector("button").onclick = () => location.reload();
       document.body.appendChild(bar);
     });
-=======
->>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
   });
 }
