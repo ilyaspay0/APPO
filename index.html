@@ -2639,23 +2639,94 @@ body{
   .crumbs-bar{ display: none !important; }
 }
 
-/* Desktop: search stays in the flow at end of topbar-right area via grid on large screens */
+
+/* =========================================================
+   DESKTOP TOPBAR — room for search, less crowding
+   ========================================================= */
 @media (min-width: 721px){
   .topbar-inner{
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
+    gap: 10px !important;
+    padding: 10px 20px !important;
+    max-width: 1200px !important;
+    margin: 0 auto !important;
   }
+  .topbar-inner > .brand{
+    flex: 0 0 auto;
+    margin-right: 4px;
+  }
+  .brand-name{
+    font-size: 18px !important;
+  }
+  .brand-name small{
+    display: block !important;
+    font-size: 9.5px !important;
+    letter-spacing: 1.2px !important;
+  }
+
+  .topbar-right{
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    min-width: 0;
+  }
+
+  .nav-link{
+    display: inline-flex !important;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Search: flexible, never a tiny stub */
   .topbar-inner > .search-wrap{
-    flex: 1 1 auto;
-    max-width: 280px;
-    margin-left: 8px;
+    flex: 1 1 220px !important;
+    min-width: 180px !important;
+    max-width: 320px !important;
+    margin-left: 8px !important;
+    margin-right: 0 !important;
   }
   html[dir="rtl"] .topbar-inner > .search-wrap{
-    margin-left: 0;
-    margin-right: 8px;
+    margin-left: 0 !important;
+    margin-right: 8px !important;
   }
+  .search-input{
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 38px !important;
+    font-size: 13.5px !important;
+    padding: 8px 14px !important;
+  }
+
+  .level-dropdown-btn,
+  .lang-toggle,
+  .theme-toggle,
+  #authArea .btn,
+  #authArea button{
+    flex-shrink: 0;
+  }
+}
+
+/* Mid desktop: hide long nav labels if still tight, keep search */
+@media (min-width: 721px) and (max-width: 980px){
+  .nav-link{ display: none !important; }
+  .topbar-inner > .search-wrap{
+    flex: 1 1 200px !important;
+    max-width: 280px !important;
+    min-width: 160px !important;
+  }
+}
+
+@media (min-width: 981px) and (max-width: 1100px){
+  .nav-link{ font-size: 12.5px !important; padding: 8px 8px !important; }
+  .topbar-inner > .search-wrap{ max-width: 240px !important; }
 }
 
 </style>
