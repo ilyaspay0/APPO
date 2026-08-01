@@ -874,10 +874,6 @@ function wireLearningDashboard(){
   });
 }
 
-// Cloud push hook kept on saveProgress via scheduleCloudPush(examId, data) — see below.
-function _saveProgressCloudHook(examId, data){
-  try{ scheduleCloudPush(examId, data); }catch(e){}
-}
 function allProgress(){
   const out = [];
   try{
@@ -1450,11 +1446,20 @@ function renderHome(){
     <section class="hero">
       <div class="hero-copy">
         <span class="hero-badge"><span class="dot"></span>${t("hero_badge")}</span>
-        <h1>${t("hero_title")}</h1>
-        <p>${t("hero_desc")}</p>
+        <h1>${currentLang === "ar"
+          ? "حضّر لمبارياتك بـ<em>أسئلة مصحّحة</em>"
+          : "Prépare tes concours avec des <em>QCM corrigés</em>"}</h1>
+        <p>${currentLang === "ar"
+          ? "آلاف الأسئلة مع الشرح — وضع الدرس أو الامتحان الموقوت. تقدّمك يُحفظ على هذا الجهاز."
+          : "Des milliers de questions expliquées pour ENSA, Médecine, ENCG, Bac+2 et plus. Mode cours ou examen chronométré — progression sauvegardée ici."}</p>
         <div class="cta-row">
-          <a class="btn primary lg" href="#concours-grid">${t("hero_cta_start")}</a>
+          <a class="btn primary lg" href="#concours-grid">${currentLang === "ar" ? "اختيار المباراة" : "Choisir mon concours"}</a>
           <a class="btn lg" href="#/progression">${t("hero_cta_progress")}</a>
+        </div>
+        <div class="hero-trust" style="display:flex;flex-wrap:wrap;gap:14px;margin-top:18px;font-size:12.5px;font-weight:500;color:var(--ink-soft);">
+          <span style="display:inline-flex;align-items:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2E7D5B" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>${currentLang === "ar" ? "تصحيحات مفصّلة" : "Corrections détaillées"}</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2E7D5B" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>${currentLang === "ar" ? "مجاني 100٪" : "100 % gratuit"}</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2E7D5B" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>FR / AR</span>
         </div>
       </div>
       <div class="exam-cover">
