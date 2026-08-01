@@ -1462,13 +1462,28 @@ function renderHome(){
           <span style="display:inline-flex;align-items:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2E7D5B" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>FR / AR</span>
         </div>
       </div>
-      <div class="exam-cover">
-        <div class="row"><span>${t("cover_candidate")}</span><span>${t("cover_you")}</span></div>
-        <div class="row"><span>${t("cover_concours")}</span><span>${t("cover_free_choice")}</span></div>
-        <div class="row"><span>${t("cover_duration")}</span><span>${t("cover_timed")}</span></div>
-        <div class="row"><span>${t("cover_questions")}</span><span>${totalQ.toLocaleString("fr-FR")} ${t("cover_available")}</span></div>
-        <div class="row"><span>${t("cover_status")}</span><span>${t("cover_ready")}</span></div>
-        <div class="stamp"><img src="images/logo-96.png" alt="Suprepa"></div>
+      <div class="hero-preview">
+        <div class="preview-card">
+          <div class="preview-head">
+            <span class="preview-title">${currentLang === "ar" ? "الطب · فيزياء" : "Médecine · Physique"} 2024</span>
+            <span class="preview-badge">${currentLang === "ar" ? "وضع الدرس" : "Mode cours"}</span>
+          </div>
+          <div class="preview-body">
+            <p class="preview-q">${currentLang === "ar"
+              ? "س12 — كرة كتلتها 430 غ تُقذف بسرعة 20 م/ث بزاوية 20°. ما معادلة المسار (بدون احتكاك)؟"
+              : "Q12 — Un ballon de masse 430 g est lancé à 20 m/s sous un angle de 20°. Quelle est l'équation de la trajectoire (sans frottement) ?"}</p>
+            <div class="preview-opts" role="list">
+              <div class="preview-opt" role="listitem"><span class="letter">A</span><span>z = x·tan α − (g x²)/(2 v₀²)</span></div>
+              <div class="preview-opt correct" role="listitem"><span class="letter">B</span><span>z = x·tan α − (g x²)/(2 v₀² cos²α)</span></div>
+              <div class="preview-opt" role="listitem"><span class="letter">C</span><span>z = x·sin α − (g x²)/v₀²</span></div>
+              <div class="preview-opt" role="listitem"><span class="letter">D</span><span>z = x·cos α − g x² / 2</span></div>
+            </div>
+            <div class="preview-foot">
+              <span class="preview-score"><span class="check" aria-hidden="true">✓</span> ${currentLang === "ar" ? "النتيجة 78 ٪ في هذا الامتحان" : "Score 78 % sur cet examen"}</span>
+              <span class="preview-progress">12 / 40</span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1481,33 +1496,6 @@ function renderHome(){
 
     ${learningDashboardHtml()}
 
-    <div class="section-head"><h2>${currentLang === "ar" ? "اختر مستواك" : "Choisis ton niveau"}</h2></div>
-    <div class="level-grid">
-      <a class="level-card" href="#concours-grid">
-        <span class="level-ico" aria-hidden="true">📘</span>
-        <h3>${currentLang === "ar" ? "باك / ما بعد الباك" : "Bac · Post-bac"}</h3>
-        <p>${currentLang === "ar" ? "ENSA، الطب، ENCG..." : "ENSA, Médecine, ENCG, ISPITS…"}</p>
-        <span class="level-meta">${totalQ.toLocaleString("fr-FR")} Q</span>
-      </a>
-      <a class="level-card" href="#/bac2">
-        <span class="level-ico" aria-hidden="true">💻</span>
-        <h3>Bac+2</h3>
-        <p>${currentLang === "ar" ? "إجابات حرة و QCM" : "Réponse libre & QCM"}</p>
-        <span class="level-meta">EHTP, EMI…</span>
-      </a>
-      <a class="level-card" href="#/bac3">
-        <span class="level-ico" aria-hidden="true">🎓</span>
-        <h3>${currentLang === "ar" ? "التعليم" : "Enseignement"}</h3>
-        <p>${currentLang === "ar" ? "ابتدائي وثانوي" : "Primaire & secondaire"}</p>
-        <span class="level-meta">QCM</span>
-      </a>
-      <a class="level-card" href="#/master">
-        <span class="level-ico" aria-hidden="true">🏛️</span>
-        <h3>Master</h3>
-        <p>${currentLang === "ar" ? "ولوج الماستر" : "Accès masters"}</p>
-        <span class="level-meta">Libre & QCM</span>
-      </a>
-    </div>
 
     ${concoursPickerHtml()}
     ${resumeHtml}
