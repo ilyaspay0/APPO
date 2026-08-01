@@ -29,7 +29,7 @@ const I18N = {
     footer_contact_title:"Contact", footer_contact_text:"Une question, une suggestion, un problème sur un examen ? Écris-nous, on répond rapidement.",
     footer_copyright:"© 2026 Suprepa — banque de QCM d'entraînement pour les concours marocains",
     auth_sub:"Synchronise ta progression entre ton téléphone et ton ordinateur.", auth_google:"Continuer avec Google",
-    auth_or:"ou", auth_email:"Email", auth_password:"Mot de passe", auth_login:"Se connecter", auth_signup:"Créer mon compte",
+    auth_or:"ou", auth_email:"Email", auth_password:"Mot de passe", auth_username:"Nom d'utilisateur", auth_username_ph:"ex. sara_ensa", auth_login:"Se connecter", auth_signup:"Créer mon compte",
     auth_no_account:"Pas encore de compte ?", auth_have_account:"Déjà un compte ?",
     auth_create_account:"Créer un compte", auth_close:"Fermer", auth_signout:"Se déconnecter", auth_connected:"Connecté",
     auth_connect_title:"Facultatif — connecte-toi pour garder ta progression entre ton téléphone et ton ordinateur",
@@ -113,7 +113,7 @@ const I18N = {
     comments_login_btn:"Se connecter", comments_placeholder:"Pose ta question ou aide quelqu'un…",
     comments_reply_placeholder:"Ta réponse…", comments_send:"Publier", comments_reply:"Répondre",
     comments_cancel:"Annuler", comments_report:"Signaler", comments_reported:"Signalé, merci",
-    comments_delete:"Supprimer", comments_empty:"Aucun commentaire pour l'instant — sois le premier à poser une question.",
+    comments_delete:"Supprimer", comments_you:"toi", comments_delete_confirm:"Supprimer ce commentaire ?", comments_empty:"Aucun commentaire pour l'instant — sois le premier à poser une question.",
     comments_error:"Impossible de charger les commentaires.", comments_hidden_reported:"Commentaire masqué (signalé plusieurs fois).",
   },
   ar: {
@@ -126,7 +126,7 @@ const I18N = {
     footer_contact_title:"تواصل معنا", footer_contact_text:"سؤال، اقتراح، أو مشكلة في امتحان؟ اكتب لنا، نرد بسرعة.",
     footer_copyright:"© 2026 Suprepa — بنك أسئلة للتدرب على المباريات المغربية",
     auth_sub:"زامن تقدمك بين هاتفك وحاسوبك.", auth_google:"الاستمرار باستخدام Google",
-    auth_or:"أو", auth_email:"البريد الإلكتروني", auth_password:"كلمة المرور", auth_login:"تسجيل الدخول", auth_signup:"إنشاء حسابي",
+    auth_or:"أو", auth_email:"البريد الإلكتروني", auth_password:"كلمة المرور", auth_username:"اسم المستخدم", auth_username_ph:"مثال sara_ensa", auth_login:"تسجيل الدخول", auth_signup:"إنشاء حسابي",
     auth_no_account:"ليس لديك حساب؟", auth_have_account:"لديك حساب؟",
     auth_create_account:"إنشاء حساب", auth_close:"إغلاق", auth_signout:"تسجيل الخروج", auth_connected:"متصل",
     auth_connect_title:"اختياري — سجّل الدخول للاحتفاظ بتقدمك بين هاتفك وحاسوبك",
@@ -210,7 +210,7 @@ const I18N = {
     comments_login_btn:"تسجيل الدخول", comments_placeholder:"اطرح سؤالك أو ساعد أحدًا…",
     comments_reply_placeholder:"ردّك…", comments_send:"نشر", comments_reply:"الرد",
     comments_cancel:"إلغاء", comments_report:"الإبلاغ", comments_reported:"تم الإبلاغ، شكرًا",
-    comments_delete:"حذف", comments_empty:"لا توجد تعليقات بعد — كن أول من يطرح سؤالاً.",
+    comments_delete:"حذف", comments_you:"أنت", comments_delete_confirm:"حذف هذا التعليق؟", comments_empty:"لا توجد تعليقات بعد — كن أول من يطرح سؤالاً.",
     comments_error:"تعذر تحميل التعليقات.", comments_hidden_reported:"تعليق مخفي (تم الإبلاغ عنه عدة مرات).",
   }
 };
@@ -956,6 +956,13 @@ function setAuthMode(mode){
   document.getElementById("authSubmitBtn").textContent = mode === "signup" ? t("auth_signup") : t("auth_login");
   document.getElementById("authSwitchText").textContent = mode === "signup" ? t("auth_have_account") : t("auth_no_account");
   document.getElementById("authSwitchBtn").textContent = mode === "signup" ? t("auth_login") : t("auth_create_account");
+  const userWrap = document.getElementById("authUsernameWrap");
+  if (userWrap) userWrap.hidden = mode !== "signup";
+  const userInput = document.getElementById("authUsername");
+  if (userInput){
+    userInput.required = mode === "signup";
+    if (mode !== "signup") userInput.value = "";
+  }
 }
 function showAuthError(msg){
   const el = document.getElementById("authError");
@@ -998,9 +1005,19 @@ function initAuthModalEvents(){
     if (!sbClient) return;
     const email = document.getElementById("authEmail").value.trim();
     const password = document.getElementById("authPassword").value;
+    const usernameEl = document.getElementById("authUsername");
+    const username = usernameEl ? usernameEl.value.trim().replace(/\s+/g, "_").slice(0, 32) : "";
     try{
       if (authMode === "signup"){
-        const { data, error } = await sbClient.auth.signUp({ email, password });
+        if (!username || username.length < 2){
+          showAuthError(currentLang === "ar" ? "اختر اسم مستخدم (حرفان على الأقل)" : "Choisis un nom d'utilisateur (2 caractères min.)");
+          return;
+        }
+        const { data, error } = await sbClient.auth.signUp({
+          email,
+          password,
+          options: { data: { username } }
+        });
         if (error) throw error;
         if (data.user && !data.session){
           showAuthError(t("auth_signup_success"));
@@ -1061,8 +1078,18 @@ async function mergeCloudProgress(uid){
   }catch(e){ console.warn("cloud merge failed", e); }
 }
 
-// ---------- Comments (per-question, connexion requise pour poster) ----------
+// ---------- Comments (signed-in only to post; own comments deletable) ----------
 const FLAG_HIDE_THRESHOLD = 3; // masqué côté client au-delà de ce nombre de signalements
+
+/** Public username shown under questions */
+function getUserDisplayName(user){
+  if (!user) return currentLang === "ar" ? "طالب" : "Étudiant";
+  const meta = user.user_metadata || {};
+  const name = (meta.username || meta.user_name || meta.full_name || meta.name || "").trim();
+  if (name) return name.slice(0, 32);
+  const email = (user.email || "").split("@")[0];
+  return (email || (currentLang === "ar" ? "طالب" : "Étudiant")).slice(0, 32);
+}
 
 async function loadComments(examId, idx){
   if (!sbClient) return [];
@@ -1071,19 +1098,28 @@ async function loadComments(examId, idx){
     .select("id, parent_id, user_id, display_name, body, flagged_count, created_at")
     .eq("exam_id", examId)
     .eq("question_idx", idx)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
   if (error) throw error;
   return data || [];
 }
 
 async function postComment(examId, idx, body, parentId){
-  if (!sbClient || !currentUser) return null;
-  const displayName = (currentUser.email || "").split("@")[0] || "Étudiant";
+  if (!sbClient || !currentUser){
+    openAuthModal();
+    throw new Error("auth_required");
+  }
+  const text = (body || "").trim();
+  if (!text) return null;
+  const displayName = getUserDisplayName(currentUser);
   const { data, error } = await sbClient
     .from("comments")
     .insert({
-      exam_id: examId, question_idx: idx, parent_id: parentId || null,
-      user_id: currentUser.id, display_name: displayName, body: body.trim()
+      exam_id: examId,
+      question_idx: idx,
+      parent_id: parentId || null,
+      user_id: currentUser.id,
+      display_name: displayName,
+      body: text
     })
     .select()
     .single();
@@ -1093,7 +1129,12 @@ async function postComment(examId, idx, body, parentId){
 
 async function deleteComment(commentId){
   if (!sbClient || !currentUser) return;
-  await sbClient.from("comments").delete().eq("id", commentId).eq("user_id", currentUser.id);
+  const { error } = await sbClient
+    .from("comments")
+    .delete()
+    .eq("id", commentId)
+    .eq("user_id", currentUser.id);
+  if (error) throw error;
 }
 
 async function reportComment(commentId){
@@ -2521,24 +2562,33 @@ async function renderSession(examId, mode, startIdx){
       } else {
         const visible = cache.filter(c => c.flagged_count < FLAG_HIDE_THRESHOLD);
         const hiddenCount = cache.length - visible.length;
-        const topLevel = visible.filter(c => !c.parent_id);
+        const byNewest = (a, b) => new Date(b.created_at) - new Date(a.created_at);
+        const topLevel = visible.filter(c => !c.parent_id).sort(byNewest);
         const repliesByParent = {};
         visible.filter(c => c.parent_id).forEach(c => {
           (repliesByParent[c.parent_id] = repliesByParent[c.parent_id] || []).push(c);
         });
+        Object.keys(repliesByParent).forEach(pid => repliesByParent[pid].sort(byNewest));
         count = ` (${topLevel.length})`;
 
         const dateFmt = (iso) => new Date(iso).toLocaleDateString(currentLang === "ar" ? "ar" : "fr-FR", {day:"numeric", month:"short"});
         const renderOne = (c, isReply) => {
           const mine = currentUser && c.user_id === currentUser.id;
+          const uname = (c.display_name || "Étudiant").trim();
+          const initial = (uname.charAt(0) || "?").toUpperCase();
           return `
-          <div class="comment-item${isReply ? " comment-reply" : ""}">
-            <div class="comment-meta"><b>${escapeHtml(c.display_name)}</b> · <span class="comment-date">${dateFmt(c.created_at)}</span></div>
+          <div class="comment-item${isReply ? " comment-reply" : ""}${mine ? " comment-mine" : ""}">
+            <div class="comment-meta">
+              <span class="comment-avatar" aria-hidden="true">${escapeHtml(initial)}</span>
+              <b class="comment-user">${escapeHtml(uname)}</b>
+              ${mine ? `<span class="comment-you">${t("comments_you")}</span>` : ""}
+              <span class="comment-date">${dateFmt(c.created_at)}</span>
+            </div>
             <div class="comment-body">${escapeHtml(c.body)}</div>
             <div class="comment-actions">
               ${!isReply && currentUser ? `<button class="comment-action-btn" data-reply-to="${c.id}">${t("comments_reply")}</button>` : ""}
               ${currentUser && !mine ? `<button class="comment-action-btn" data-report="${c.id}">${t("comments_report")}</button>` : ""}
-              ${mine ? `<button class="comment-action-btn" data-delete="${c.id}">${t("comments_delete")}</button>` : ""}
+              ${mine ? `<button class="comment-action-btn comment-delete-btn" data-delete="${c.id}">${t("comments_delete")}</button>` : ""}
             </div>
             ${state.replyTo === c.id ? `
               <form class="comment-reply-form" data-parent="${c.id}">
@@ -2712,7 +2762,7 @@ async function renderSession(examId, mode, startIdx){
           if (!body) return;
           try{
             const inserted = await postComment(examId, idxAtClick, body, null);
-            if (Array.isArray(state.commentsCache[idxAtClick])) state.commentsCache[idxAtClick].push(inserted);
+            if (Array.isArray(state.commentsCache[idxAtClick])) state.commentsCache[idxAtClick].unshift(inserted);
           }catch(err){ console.warn("post comment failed", err); }
           await renderQuestion();
         });
@@ -2726,7 +2776,7 @@ async function renderSession(examId, mode, startIdx){
           if (!body) return;
           try{
             const inserted = await postComment(examId, idxAtClick, body, form.dataset.parent);
-            if (Array.isArray(state.commentsCache[idxAtClick])) state.commentsCache[idxAtClick].push(inserted);
+            if (Array.isArray(state.commentsCache[idxAtClick])) state.commentsCache[idxAtClick].unshift(inserted);
           }catch(err){ console.warn("post reply failed", err); }
           state.replyTo = null;
           await renderQuestion();
@@ -2749,8 +2799,11 @@ async function renderSession(examId, mode, startIdx){
       });
       commentsBody.querySelectorAll("[data-delete]").forEach(btn => {
         btn.addEventListener("click", async () => {
+          if (!currentUser){ openAuthModal(); return; }
+          if (!confirm(t("comments_delete_confirm"))) return;
           const idxAtClick = state.idx;
           const id = btn.dataset.delete;
+          btn.disabled = true;
           try{
             await deleteComment(id);
             if (Array.isArray(state.commentsCache[idxAtClick])){
