@@ -1319,18 +1319,47 @@ function concoursPickerHtml(){
   return `
     <div class="section-head" id="concours-grid">
       <h2>${t("section_choose_concours")}</h2>
-      <div class="level-tabs" role="tablist">
-        ${tabs.map(([key, label]) => `<button class="level-tab ${homeLevel===key?'active':''}" data-level="${key}" role="tab" aria-selected="${homeLevel===key}">${label}</button>`).join("")}
+      <div class="level-tabs" role="tablist" id="levelTabs">
+        <span class="level-tabs-pill" id="levelTabsPill" aria-hidden="true"></span>
+        ${tabs.map(([key, label]) => `<button type="button" class="level-tab ${homeLevel===key?'active':''}" data-level="${key}" role="tab" aria-selected="${homeLevel===key}">${label}</button>`).join("")}
       </div>
     </div>
     <div id="concoursPickerBody">${concoursPickerBodyHtml()}</div>`;
 }
+
+/** Slide the blue pill under the active level tab */
+function moveLevelPill(animate = true){
+  const track = document.getElementById("levelTabs");
+  const pill = document.getElementById("levelTabsPill");
+  if (!track || !pill) return;
+  const active = track.querySelector(".level-tab.active") || track.querySelector(".level-tab");
+  if (!active) return;
+  const tr = track.getBoundingClientRect();
+  const ar = active.getBoundingClientRect();
+  const x = ar.left - tr.left - track.clientLeft + track.scrollLeft;
+  const y = ar.top - tr.top - track.clientTop + track.scrollTop;
+  if (!animate) pill.style.transition = "none";
+  pill.style.width = ar.width + "px";
+  pill.style.height = ar.height + "px";
+  pill.style.transform = `translate(${x}px, ${y}px)`;
+  if (!animate){
+    // force reflow then restore transition
+    void pill.offsetWidth;
+    pill.style.transition = "";
+  }
+}
+
 async function loadLevelDataIfNeeded(level){
   if (level === "bac2" && !BAC2_DB.length){ try{ await loadBac2Meta(); }catch(e){} }
   if (level === "bac3" && !BAC3_DB.length){ try{ await loadBac3Meta(); }catch(e){} }
   if (level === "master" && !MASTER_DB.length){ try{ await loadMasterMeta(); }catch(e){} }
 }
 function wireConcoursPicker(){
+  const track = document.getElementById("levelTabs");
+  // Initial position (no slide on first paint)
+  requestAnimationFrame(() => moveLevelPill(false));
+  window.addEventListener("resize", () => moveLevelPill(false), { passive: true });
+
   document.querySelectorAll(".level-tab").forEach(btn => {
     btn.addEventListener("click", async () => {
       if (btn.dataset.level === homeLevel) return;
@@ -1339,7 +1368,9 @@ function wireConcoursPicker(){
         b.classList.toggle("active", b.dataset.level === homeLevel);
         b.setAttribute("aria-selected", b.dataset.level === homeLevel);
       });
+      moveLevelPill(true);
       const body = document.getElementById("concoursPickerBody");
+      if (!body) return;
       const needsLoad = (homeLevel === "bac2" && !BAC2_DB.length) || (homeLevel === "bac3" && !BAC3_DB.length) || (homeLevel === "master" && !MASTER_DB.length);
       if (needsLoad){
         body.innerHTML = skeletonRows(2);

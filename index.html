@@ -2455,6 +2455,104 @@ body{
   .mobile-level-sheet{ display: none !important; }
 }
 
+
+/* —— Level tabs: sliding blue pill (not rectangular) —— */
+.level-tabs{
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 2px !important;
+  background: #E8EEF6 !important;
+  border: none !important;
+  border-radius: 999px !important;
+  padding: 4px !important;
+  overflow: visible !important;
+  max-width: 100%;
+  box-shadow: inset 0 1px 2px rgba(15,42,74,.06);
+}
+.level-tabs-pill{
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1A6FE0 0%, #1660D1 55%, #0F4CAE 100%);
+  box-shadow:
+    0 2px 8px rgba(22,96,209,.35),
+    0 1px 2px rgba(15,42,74,.12);
+  transition: transform .32s cubic-bezier(.32,.72,0,1),
+              width .32s cubic-bezier(.32,.72,0,1),
+              height .32s cubic-bezier(.32,.72,0,1);
+  pointer-events: none;
+  will-change: transform, width;
+}
+.level-tab{
+  position: relative;
+  z-index: 1;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 999px !important;
+  padding: 9px 16px !important;
+  min-height: 38px !important;
+  font-family: var(--font-body) !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  color: var(--ink-soft) !important;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: color .2s ease !important;
+}
+.level-tab:hover{
+  color: var(--ink) !important;
+  background: transparent !important;
+}
+.level-tab.active,
+.level-tab[aria-selected="true"]{
+  color: #fff !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.level-tab.active:hover{
+  color: #fff !important;
+}
+
+:root[data-theme="dark"] .level-tabs{
+  background: rgba(255,255,255,.08) !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.25);
+}
+:root[data-theme="dark"] .level-tabs-pill{
+  background: linear-gradient(135deg, #2E7BD6, #1660D1);
+}
+
+@media (max-width: 640px){
+  .section-head#concours-grid,
+  .section-head:has(.level-tabs){
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+  .level-tabs{
+    width: 100%;
+    justify-content: stretch;
+  }
+  .level-tab{
+    flex: 1;
+    text-align: center;
+    padding: 10px 8px !important;
+    font-size: 12.5px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .level-tabs-pill{
+    transition: none !important;
+  }
+}
+
 </style>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 </head>
