@@ -2553,6 +2553,117 @@ body{
   }
 }
 
+
+/* =========================================================
+   Mobile topbar — compact, no empty blue void
+   ========================================================= */
+@media (max-width: 720px){
+  header.topbar{
+    /* Keep a little notch padding, not a huge empty band */
+    padding-top: max(4px, env(safe-area-inset-top, 0px)) !important;
+  }
+  .topbar-inner{
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    grid-template-areas:
+      "brand actions"
+      "search search" !important;
+    align-items: center !important;
+    column-gap: 8px !important;
+    row-gap: 8px !important;
+    padding: 8px 12px 10px !important;
+    flex-wrap: nowrap !important;
+  }
+  .topbar-inner > .brand{
+    grid-area: brand;
+    min-width: 0;
+  }
+  .topbar-right{
+    grid-area: actions;
+    display: flex !important;
+    flex: none !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+  .search-wrap{
+    grid-area: search;
+    flex: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Hide desktop-only chrome already handled; keep actions tight */
+  .nav-link,
+  .level-dropdown{ display: none !important; }
+
+  .brand-name{
+    font-size: 17px !important;
+  }
+  .brand-name small{ display: none !important; }
+  .brand-logo,
+  .brand img{
+    width: 30px !important;
+    height: 30px !important;
+  }
+  .brand{
+    display: inline-flex !important;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Compact control chips */
+  .lang-toggle,
+  .theme-toggle,
+  #authArea .btn,
+  #authArea button{
+    min-height: 36px !important;
+    padding: 6px 10px !important;
+    font-size: 12.5px !important;
+    border-radius: 999px !important;
+  }
+  .theme-toggle{
+    width: 36px !important;
+    padding: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+  .search-input{
+    min-height: 42px !important;
+    font-size: 16px !important;
+    border-radius: 999px !important;
+  }
+
+  /* Crumbs stay hidden on phone */
+  .crumbs-bar{ display: none !important; }
+}
+
+/* RTL: same grid — brand starts on the inline-start side naturally */
+html[dir="rtl"] .topbar-inner{
+  grid-template-columns: auto 1fr !important;
+  grid-template-areas:
+    "actions brand"
+    "search search" !important;
+}
+html[dir="rtl"] .topbar-right{
+  justify-content: flex-start !important;
+}
+/* Actually for RTL we want brand on the right (start in RTL) and actions on the left.
+   Default grid with brand | actions already flips with direction if we use logical placement.
+   Prefer simpler: use direction-aware flex without swapping areas. */
+html[dir="rtl"] .topbar-inner{
+  grid-template-columns: 1fr auto !important;
+  grid-template-areas:
+    "brand actions"
+    "search search" !important;
+}
+html[dir="rtl"] .topbar-right{
+  justify-content: flex-end !important;
+}
+
 </style>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 </head>
