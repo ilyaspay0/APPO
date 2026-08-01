@@ -714,7 +714,173 @@ function loadProgress(examId){
 }
 function saveProgress(examId, data){
   try{ localStorage.setItem("prepari:progress:"+examId, JSON.stringify(data)); }catch(e){}
+<<<<<<< HEAD
+  // Feed spaced-review queue whenever progress is saved with answers.
+  try{ updateSpacedFromProgress(examId, data); }catch(e){}
+  try{ touchStudyActivity(); }catch(e){}
+  try{ scheduleCloudPush(examId, data); }catch(e){}
+}
+
+// ---------- Learning loop: spaced review, streaks, exam-date goal ----------
+const SPACED_KEY = "suprepa:spaced-v1";
+const STREAK_KEY = "suprepa:streak-v1";
+const GOAL_KEY = "suprepa:exam-goal-v1";
+// SM-2-lite intervals (days): wrong → 1d, hard → 3d, ok → 7d, easy → 14d
+const SPACED_INTERVALS = [1, 3, 7, 14, 30];
+
+function loadSpaced(){
+  try{ return JSON.parse(localStorage.getItem(SPACED_KEY)) || {}; }catch(e){ return {}; }
+}
+function saveSpaced(map){
+  try{ localStorage.setItem(SPACED_KEY, JSON.stringify(map)); }catch(e){}
+}
+function spacedItemKey(examId, qi){ return examId + ":" + qi; }
+
+/** After an answer is scored, schedule next review. quality: 0 wrong, 1 ok, 2 easy */
+function scheduleReview(examId, qi, quality){
+  const map = loadSpaced();
+  const k = spacedItemKey(examId, qi);
+  const prev = map[k] || { intervalIdx: 0, due: 0, wrong: 0 };
+  let idx = prev.intervalIdx || 0;
+  if (quality <= 0){ idx = 0; prev.wrong = (prev.wrong||0)+1; }
+  else if (quality === 1){ idx = Math.min(idx + 1, SPACED_INTERVALS.length - 1); }
+  else { idx = Math.min(idx + 2, SPACED_INTERVALS.length - 1); }
+  const days = SPACED_INTERVALS[idx];
+  map[k] = {
+    examId, qi, intervalIdx: idx,
+    due: Date.now() + days * 86400000,
+    wrong: prev.wrong || 0,
+    updatedAt: Date.now()
+  };
+  saveSpaced(map);
+}
+
+function updateSpacedFromProgress(examId, data){
+  // Without corrections we cannot score; mark answered items as due-soon if flagged only.
+  if (!data || !data.answers) return;
+  const map = loadSpaced();
+  Object.keys(data.answers).forEach(qi => {
+    const k = spacedItemKey(examId, qi);
+    if (!map[k]){
+      map[k] = { examId, qi: Number(qi), intervalIdx: 0, due: Date.now() + 86400000, wrong: 0, updatedAt: Date.now() };
+    }
+  });
+  // Flagged items get accelerated review (due tomorrow at latest)
+  Object.keys(data.flagged || {}).forEach(qi => {
+    const k = spacedItemKey(examId, qi);
+    const cur = map[k] || { examId, qi: Number(qi), intervalIdx: 0, wrong: 0 };
+    cur.due = Math.min(cur.due || Infinity, Date.now() + 12 * 3600000);
+    cur.flagged = true;
+    cur.updatedAt = Date.now();
+    map[k] = cur;
+  });
+  saveSpaced(map);
+}
+
+function dueReviews(limit){
+  const map = loadSpaced();
+  const now = Date.now();
+  return Object.values(map)
+    .filter(x => x.due && x.due <= now)
+    .sort((a,b) => (b.wrong||0) - (a.wrong||0) || a.due - b.due)
+    .slice(0, limit || 20);
+}
+
+function touchStudyActivity(){
+  const today = new Date().toISOString().slice(0,10);
+  let s;
+  try{ s = JSON.parse(localStorage.getItem(STREAK_KEY)) || {}; }catch(e){ s = {}; }
+  if (s.last === today) return;
+  const y = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+  s.count = (s.last === y) ? (s.count || 0) + 1 : 1;
+  s.last = today;
+  s.best = Math.max(s.best || 0, s.count);
+  try{ localStorage.setItem(STREAK_KEY, JSON.stringify(s)); }catch(e){}
+}
+
+function getStreak(){
+  try{ return JSON.parse(localStorage.getItem(STREAK_KEY)) || { count: 0, best: 0, last: null }; }
+  catch(e){ return { count: 0, best: 0, last: null }; }
+}
+
+function getExamGoal(){
+  try{ return JSON.parse(localStorage.getItem(GOAL_KEY)) || null; }catch(e){ return null; }
+}
+function setExamGoal(isoDate, label){
+  try{ localStorage.setItem(GOAL_KEY, JSON.stringify({ date: isoDate, label: label || "" })); }catch(e){}
+}
+function daysUntilGoal(){
+  const g = getExamGoal();
+  if (!g || !g.date) return null;
+  const t = new Date(g.date + "T00:00:00");
+  if (isNaN(t.getTime())) return null;
+  return Math.ceil((t - new Date()) / 86400000);
+}
+
+function learningDashboardHtml(){
+  const streak = getStreak();
+  const due = dueReviews(50);
+  const days = daysUntilGoal();
+  const goal = getExamGoal();
+  const today = new Date().toISOString().slice(0,10);
+  const activeToday = streak.last === today;
+
+  const dueLabel = currentLang === "ar"
+    ? `${due.length} للمراجعة`
+    : (due.length === 1 ? "1 à revoir" : `${due.length} à revoir`);
+  const streakLabel = currentLang === "ar"
+    ? `${streak.count || 0} يوم متتالي`
+    : `${streak.count || 0} jour${(streak.count||0)>1?"s":""} d'affilée`;
+  const goalLabel = days === null
+    ? (currentLang === "ar" ? "حدد تاريخ المباراة" : "Fixer la date du concours")
+    : (days < 0
+      ? (currentLang === "ar" ? "انتهى التاريخ" : "Date dépassée")
+      : (currentLang === "ar" ? `${days} يوم متبقي` : (days === 0 ? "C'est aujourd'hui" : `${days} jour${days>1?"s":""} restants`)));
+
+  return `
+    <div class="learn-strip" role="region" aria-label="${currentLang === "ar" ? "حلقة التعلم" : "Boucle d'apprentissage"}">
+      <div class="learn-card">
+        <div class="learn-kicker">${currentLang === "ar" ? "السلسلة" : "Série"}</div>
+        <div class="learn-value">${streak.count || 0}</div>
+        <div class="learn-sub">${streakLabel}${activeToday ? " · ✓" : ""}</div>
+      </div>
+      <a class="learn-card learn-card--link" href="#/mistakes">
+        <div class="learn-kicker">${currentLang === "ar" ? "مراجعة متباعدة" : "Révision espacée"}</div>
+        <div class="learn-value">${due.length}</div>
+        <div class="learn-sub">${dueLabel}</div>
+      </a>
+      <button type="button" class="learn-card learn-card--btn" id="examGoalBtn" aria-haspopup="dialog">
+        <div class="learn-kicker">${currentLang === "ar" ? "يوم المباراة" : "Jour J"}</div>
+        <div class="learn-value learn-value--sm">${days === null ? "—" : (days < 0 ? "!" : days)}</div>
+        <div class="learn-sub">${goal && goal.label ? escapeHtml(goal.label) + " · " : ""}${goalLabel}</div>
+      </button>
+    </div>`;
+}
+
+function wireLearningDashboard(){
+  const btn = document.getElementById("examGoalBtn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const cur = getExamGoal() || {};
+    const label = prompt(currentLang === "ar" ? "اسم المباراة (اختياري)" : "Nom du concours (optionnel)", cur.label || "");
+    if (label === null) return;
+    const date = prompt(currentLang === "ar" ? "تاريخ المباراة (YYYY-MM-DD)" : "Date du concours (YYYY-MM-DD)", cur.date || "");
+    if (!date) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)){
+      alert(currentLang === "ar" ? "صيغة التاريخ غير صحيحة" : "Format de date invalide (YYYY-MM-DD)");
+      return;
+    }
+    setExamGoal(date, label || "");
+    route();
+  });
+}
+
+// Cloud push hook kept on saveProgress via scheduleCloudPush(examId, data) — see below.
+function _saveProgressCloudHook(examId, data){
+  try{ scheduleCloudPush(examId, data); }catch(e){}
+=======
   scheduleCloudPush(examId, data);
+>>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
 }
 function allProgress(){
   const out = [];
@@ -1305,13 +1471,50 @@ function renderHome(){
       </div>
     </section>
 
+<<<<<<< HEAD
+    <div class="stat-strip" role="group" aria-label="${t("stat_questions")}">
+=======
     <div class="stat-strip">
+>>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
       <div class="stat-cell"><b>${totalQ.toLocaleString("fr-FR")}</b><span>${t("stat_questions")}</span></div>
       <div class="stat-cell"><b>${totalExams}</b><span>${t("stat_exams")}</span></div>
       <div class="stat-cell"><b>${nConcours}</b><span>${t("stat_concours")}</span></div>
       <div class="stat-cell"><b>${totalCorrected.toLocaleString("fr-FR")}</b><span>${t("stat_corrected")}</span></div>
     </div>
 
+<<<<<<< HEAD
+    ${learningDashboardHtml()}
+
+    <div class="section-head"><h2>${currentLang === "ar" ? "اختر مستواك" : "Choisis ton niveau"}</h2></div>
+    <div class="level-grid">
+      <a class="level-card" href="#concours-grid">
+        <span class="level-ico" aria-hidden="true">📘</span>
+        <h3>${currentLang === "ar" ? "باك / ما بعد الباك" : "Bac · Post-bac"}</h3>
+        <p>${currentLang === "ar" ? "ENSA، الطب، ENCG..." : "ENSA, Médecine, ENCG, ISPITS…"}</p>
+        <span class="level-meta">${totalQ.toLocaleString("fr-FR")} Q</span>
+      </a>
+      <a class="level-card" href="#/bac2">
+        <span class="level-ico" aria-hidden="true">💻</span>
+        <h3>Bac+2</h3>
+        <p>${currentLang === "ar" ? "إجابات حرة و QCM" : "Réponse libre & QCM"}</p>
+        <span class="level-meta">EHTP, EMI…</span>
+      </a>
+      <a class="level-card" href="#/bac3">
+        <span class="level-ico" aria-hidden="true">🎓</span>
+        <h3>${currentLang === "ar" ? "التعليم" : "Enseignement"}</h3>
+        <p>${currentLang === "ar" ? "ابتدائي وثانوي" : "Primaire & secondaire"}</p>
+        <span class="level-meta">QCM</span>
+      </a>
+      <a class="level-card" href="#/master">
+        <span class="level-ico" aria-hidden="true">🏛️</span>
+        <h3>Master</h3>
+        <p>${currentLang === "ar" ? "ولوج الماستر" : "Accès masters"}</p>
+        <span class="level-meta">Libre & QCM</span>
+      </a>
+    </div>
+
+=======
+>>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
     ${concoursPickerHtml()}
     ${resumeHtml}
     ${featuresHtml}
@@ -1320,6 +1523,10 @@ function renderHome(){
     </div>
   `;
   wireConcoursPicker();
+<<<<<<< HEAD
+  wireLearningDashboard();
+=======
+>>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
   initScrollReveal();
 }
 
@@ -2436,6 +2643,17 @@ async function renderSession(examId, mode, startIdx){
       if (state.reviewMode && mode === "examen") return; // read-only review of a timed exam
       state.answers[state.idx] = letter;
       persist();
+<<<<<<< HEAD
+      // Spaced repetition: schedule based on correctness when correction is known
+      try{
+        const corrections = await ensureCorrections();
+        const c = corrections[state.idx];
+        if (c && c.correct){
+          scheduleReview(examId, state.idx, letter === c.correct ? 1 : 0);
+        }
+      }catch(e){}
+=======
+>>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
       // Retour visuel immédiat : si une correction va être révélée (mode cours),
       // l'appel réseau peut prendre un instant — on ne laisse jamais l'écran figé sans rien.
       const willFetchCorrection = mode === "cours";
@@ -2751,5 +2969,25 @@ boot();
 if ("serviceWorker" in navigator){
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
+<<<<<<< HEAD
+    // New deploy → new CACHE_VERSION → user gets a lightweight toast to refresh
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      const bar = document.createElement("div");
+      bar.setAttribute("role", "status");
+      bar.style.cssText = "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--brand-blue,#1660D1);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(15,42,74,.25);display:flex;gap:12px;align-items:center;max-width:92vw;";
+      bar.innerHTML = (typeof currentLang !== "undefined" && currentLang === "ar"
+        ? "تحديث متاح"
+        : "Nouvelle version disponible") +
+        ' <button type="button" style="background:#fff;color:#0F2A4A;border:0;border-radius:7px;padding:6px 10px;font-weight:700;cursor:pointer;">' +
+        (typeof currentLang !== "undefined" && currentLang === "ar" ? "تحديث" : "Actualiser") +
+        "</button>";
+      bar.querySelector("button").onclick = () => location.reload();
+      document.body.appendChild(bar);
+    });
+=======
+>>>>>>> 22b2323477bc0e757fb893cbd0e31b66911964b7
   });
 }
