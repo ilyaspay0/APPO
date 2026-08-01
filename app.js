@@ -20,7 +20,7 @@ const prefersReducedMotion = () =>
 // rules (singular/dual/plural-3-10/plural-11+) — that's a known simplification, not a bug.
 const I18N = {
   fr: {
-    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", nav_level:"Niveau ▾", nav_bac2:"Concours Bac+2", nav_bac3:"Concours d'enseignement", nav_master:"Concours Master", skip_to_content:"Aller au contenu",
+    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", nav_level:"Niveau", nav_bac2:"Concours Bac+2", nav_bac3:"Concours d'enseignement", nav_master:"Concours Master", skip_to_content:"Aller au contenu",
     search_placeholder:"Chercher un concours, une matière…",
     theme_to_dark:"Passer en mode sombre", theme_to_light:"Passer en mode clair",
     lang_to_ar:"Passer l'interface en arabe", lang_to_fr:"Passer l'interface en français",
@@ -117,7 +117,7 @@ const I18N = {
     comments_error:"Impossible de charger les commentaires.", comments_hidden_reported:"Commentaire masqué (signalé plusieurs fois).",
   },
   ar: {
-    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", nav_level:"المستوى ▾", nav_bac2:"مباريات Bac+2", nav_bac3:"مباريات التعليم", nav_master:"مباريات الماستر", skip_to_content:"الانتقال إلى المحتوى",
+    nav_inedit:"أسئلة حصرية", nav_progression:"تقدمي", nav_home:"الرئيسية", nav_level:"المستوى", nav_bac2:"مباريات Bac+2", nav_bac3:"مباريات التعليم", nav_master:"مباريات الماستر", skip_to_content:"الانتقال إلى المحتوى",
     search_placeholder:"ابحث عن مباراة أو مادة…",
     theme_to_dark:"التبديل إلى الوضع الداكن", theme_to_light:"التبديل إلى الوضع الفاتح",
     lang_to_ar:"التبديل إلى العربية", lang_to_fr:"التبديل إلى الفرنسية",

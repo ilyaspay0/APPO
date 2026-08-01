@@ -311,7 +311,16 @@
   .search-results .sr-meta{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); }
   .search-empty{ padding:14px; font-size:13px; color:var(--ink-soft); text-align:center; }
   .level-dropdown{ position:relative; }
-  .level-dropdown-btn{ display:flex; align-items:center; gap:4px; cursor:pointer; }
+  .level-dropdown-btn{
+    display:flex; align-items:center; gap:6px; height:32px; padding:0 14px; flex-shrink:0;
+    border-radius:20px; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.14);
+    color:#fff; font-size:13px; font-weight:600; cursor:pointer;
+    transition:background-color .15s ease;
+  }
+  .level-dropdown-btn:hover{ background:rgba(255,255,255,.24); }
+  .level-dropdown-btn[aria-expanded="true"]{ background:rgba(255,255,255,.26); }
+  .level-dropdown-btn .chevron{ transition:transform .15s ease; flex-shrink:0; }
+  .level-dropdown-btn[aria-expanded="true"] .chevron{ transform:rotate(180deg); }
   .level-dropdown-menu{
     position:absolute; top:calc(100% + 8px); left:0; min-width:220px;
     background:var(--paper-raised); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow);
@@ -902,7 +911,10 @@
       <a class="nav-link" href="#/inedit" data-i18n="nav_inedit">Questions inédites</a>
       <a class="nav-link" href="#/progression" data-i18n="nav_progression">Ma progression</a>
       <div class="level-dropdown">
-        <button class="nav-link level-dropdown-btn" id="levelDropdownBtn" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="nav_level">Niveau ▾</button>
+        <button class="level-dropdown-btn" id="levelDropdownBtn" type="button" aria-haspopup="true" aria-expanded="false">
+          <span data-i18n="nav_level">Niveau</span>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
         <div class="level-dropdown-menu" id="levelDropdownMenu" hidden>
           <a href="#/concours" data-i18n="level_bac">Bac</a>
           <a href="#/bac2" data-i18n="nav_bac2">Concours Bac+2</a>
