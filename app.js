@@ -1236,8 +1236,16 @@ async function reportComment(commentId){
 // ---------- Admin Excel import (Supabase content_exams) ----------
 function isAdmin(){
   if (!currentUser) return false;
-  const meta = currentUser.user_metadata || {};
-  return meta.role === "admin" || meta.is_admin === true;
+  const um = currentUser.user_metadata || {};
+  const am = currentUser.app_metadata || {};
+  // Supabase Dashboard can put role in User Metadata OR App Metadata
+  if (um.role === "admin" || um.is_admin === true) return true;
+  if (am.role === "admin" || am.is_admin === true) return true;
+  // Optional allowlist (your main admin email)
+  const email = (currentUser.email || "").toLowerCase().trim();
+  const allow = ["ilyas.tammouch@uit.ac.ma"];
+  if (email && allow.includes(email)) return true;
+  return false;
 }
 
 function makeUploadId(niveau, concours, matiere, annee){
