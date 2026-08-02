@@ -38,6 +38,24 @@ const I18N = {
     err_password_short:"Le mot de passe doit contenir au moins 6 caractères.", err_invalid_email:"Adresse email invalide.",
     err_confirm_email:"Confirme d'abord ton adresse email (vérifie ta boîte mail).", err_generic:"Une erreur est survenue. Réessaie.",
     auth_signup_success:"Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.",
+    admin_title:"Admin — import Excel",
+    admin_denied:"Accès réservé aux administrateurs.",
+    admin_need_login:"Connecte-toi avec un compte admin.",
+    admin_niveau:"Niveau",
+    admin_file:"Fichier Excel (.xlsx)",
+    admin_concours:"Concours (si absent du fichier)",
+    admin_matiere:"Matière (si absente du fichier)",
+    admin_annee:"Année (si absente du fichier)",
+    admin_upload:"Importer et publier",
+    admin_parsing:"Lecture du fichier…",
+    admin_saving:"Publication…",
+    admin_success:"Publié : {n} examen(s), {q} question(s).",
+    admin_error:"Import impossible.",
+    admin_hint:"Colonnes attendues : Concours, Question, Option A–D, Correct Answer, Explanation. Optionnel : Matière, Année, Question Number.",
+    admin_list:"Examens importés (ce niveau)",
+    admin_empty_list:"Aucun import pour ce niveau.",
+    admin_delete:"Retirer",
+    admin_link:"Admin",
     retry:"↻ Réessayer", err_load_exams:"Impossible de charger les données de Suprepa. Vérifie ta connexion.",
     err_load_exam:"Impossible de charger cet examen. Vérifie ta connexion.",
     hero_badge:"Plateforme gratuite · Maroc", hero_title:"Prépare ton <em>concours</em>,<br>question par question.",
@@ -547,6 +565,7 @@ function byIneditMatiere(concours, matiere){
 // Les questions et corrections sont chargées à la demande via /api, examen par examen,
 // pour qu'il soit impossible de récupérer toute la banque de QCM en un seul téléchargement.
 let EXAMS_DB = [];
+const UPLOADED_BY_ID = new Map(); // admin Excel uploads (full exams)
 const examQuestionsCache = new Map();
 const examCorrectionsCache = new Map();
 
@@ -554,10 +573,19 @@ async function loadExamsMeta(){
   const res = await fetch("/api/exams");
   if (!res.ok) throw new Error("exams meta fetch failed");
   EXAMS_DB = await res.json();
+  await loadUploadedContent();
 }
 
 async function loadExamQuestions(id){
   if (examQuestionsCache.has(id)) return examQuestionsCache.get(id);
+  if (UPLOADED_BY_ID.has(id)){
+    const exam = UPLOADED_BY_ID.get(id);
+    const questions = (exam.questions || []).map(q => ({
+      num: q.num, text: q.text, options: q.options || [], hasCorrection: !!(q.correct)
+    }));
+    examQuestionsCache.set(id, questions);
+    return questions;
+  }
   const res = await fetch("/api/exam?id=" + encodeURIComponent(id));
   if (!res.ok) throw new Error("exam fetch failed");
   const data = await res.json();
@@ -567,6 +595,12 @@ async function loadExamQuestions(id){
 
 async function loadCorrections(id){
   if (examCorrectionsCache.has(id)) return examCorrectionsCache.get(id);
+  if (UPLOADED_BY_ID.has(id)){
+    const exam = UPLOADED_BY_ID.get(id);
+    const corrections = (exam.questions || []).map(q => ({ correct: q.correct || null, explanation: q.explanation || null }));
+    examCorrectionsCache.set(id, corrections);
+    return corrections;
+  }
   const res = await fetch("/api/correction?id=" + encodeURIComponent(id));
   if (!res.ok) throw new Error("correction fetch failed");
   const data = await res.json();
@@ -583,9 +617,16 @@ async function loadBac2Meta(){
   const res = await fetch("/api/bac2-exams");
   if (!res.ok) throw new Error("bac2 exams meta fetch failed");
   BAC2_DB = await res.json();
+  await loadUploadedContent();
 }
 async function loadBac2Questions(id){
   if (bac2QuestionsCache.has(id)) return bac2QuestionsCache.get(id);
+  if (UPLOADED_BY_ID.has(id)){
+    const exam = UPLOADED_BY_ID.get(id);
+    const data = { id: exam.id, questions: exam.questions || [] };
+    bac2QuestionsCache.set(id, data);
+    return data;
+  }
   const res = await fetch("/api/bac2-exam?id=" + encodeURIComponent(id));
   if (!res.ok) throw new Error("bac2 exam fetch failed");
   const data = await res.json();
@@ -594,6 +635,12 @@ async function loadBac2Questions(id){
 }
 async function loadBac2Answers(id){
   if (bac2AnswersCache.has(id)) return bac2AnswersCache.get(id);
+  if (UPLOADED_BY_ID.has(id)){
+    const exam = UPLOADED_BY_ID.get(id);
+    const answers = (exam.questions || []).map(q => q.answer || q.explanation || "");
+    bac2AnswersCache.set(id, answers);
+    return answers;
+  }
   const res = await fetch("/api/bac2-correction?id=" + encodeURIComponent(id));
   if (!res.ok) throw new Error("bac2 correction fetch failed");
   const data = await res.json();
@@ -617,9 +664,16 @@ async function loadBac3Meta(){
   const res = await fetch("/api/bac3-exams");
   if (!res.ok) throw new Error("bac3 exams meta fetch failed");
   BAC3_DB = await res.json();
+  await loadUploadedContent();
 }
 async function loadBac3Questions(id){
   if (bac3QuestionsCache.has(id)) return bac3QuestionsCache.get(id);
+  if (UPLOADED_BY_ID.has(id)){
+    const exam = UPLOADED_BY_ID.get(id);
+    const data = { id: exam.id, questions: exam.questions || [] };
+    bac3QuestionsCache.set(id, data);
+    return data;
+  }
   const res = await fetch("/api/bac3-exam?id=" + encodeURIComponent(id));
   if (!res.ok) throw new Error("bac3 exam fetch failed");
   const data = await res.json();
@@ -664,9 +718,16 @@ async function loadMasterMeta(){
   const res = await fetch("/api/master-exams");
   if (!res.ok) throw new Error("master exams meta fetch failed");
   MASTER_DB = await res.json();
+  await loadUploadedContent();
 }
 async function loadMasterQuestions(id){
   if (masterQuestionsCache.has(id)) return masterQuestionsCache.get(id);
+  if (UPLOADED_BY_ID.has(id)){
+    const exam = UPLOADED_BY_ID.get(id);
+    const data = { id: exam.id, questions: exam.questions || [] };
+    masterQuestionsCache.set(id, data);
+    return data;
+  }
   const res = await fetch("/api/master-exam?id=" + encodeURIComponent(id));
   if (!res.ok) throw new Error("master exam fetch failed");
   const data = await res.json();
@@ -917,6 +978,8 @@ async function onAuthChanged(user){
   currentUser = user;
   renderAuthArea();
   if (user) await mergeCloudProgress(user.id);
+  const parts = parseHash();
+  if (parts[0] === "admin") renderAdmin();
 }
 
 function renderAuthArea(){
@@ -925,6 +988,7 @@ function renderAuthArea(){
   if (currentUser){
     el.innerHTML = `
       <div class="auth-user">
+        ${isAdmin() ? `<a class="auth-admin-link" href="#/admin">${t("admin_link")}</a>` : ""}
         <span class="auth-email">${escapeHtml(currentUser.email || t("auth_connected"))}</span>
         <button id="authSignOutBtn" type="button">${t("auth_signout")}</button>
       </div>`;
@@ -1078,6 +1142,23 @@ async function mergeCloudProgress(uid){
   }catch(e){ console.warn("cloud merge failed", e); }
 }
 
+
+/** Localize year labels like s.d. / Lot N */
+function formatAnnee(annee){
+  const a = String(annee == null ? "" : annee).trim();
+  if (!a) return "—";
+  const low = a.toLowerCase().replace(/\s+/g, "");
+  if (low === "s.d." || low === "sd" || low === "s.d" || low === "n/a" || low === "na"){
+    return currentLang === "ar" ? "تاريخ غير معروف" : "Date inconnue";
+  }
+  // Lot 1 / Lot 2 kept as-is unless already mapped to real year in data
+  if (/^lot\s*\d+/i.test(a)){
+    const n = a.replace(/\D/g, "") || "";
+    return currentLang === "ar" ? (`مجموعة ${n}` || a) : a.replace(/^lot/i, "Lot");
+  }
+  return a;
+}
+
 // ---------- Comments (signed-in only to post; own comments deletable) ----------
 const FLAG_HIDE_THRESHOLD = 3; // masqué côté client au-delà de ce nombre de signalements
 
@@ -1089,6 +1170,15 @@ function getUserDisplayName(user){
   if (name) return name.slice(0, 32);
   const email = (user.email || "").split("@")[0];
   return (email || (currentLang === "ar" ? "طالب" : "Étudiant")).slice(0, 32);
+}
+
+/** Initials from "Nom Prenom" or username (max 2 letters) */
+function getInitials(name){
+  const s = String(name || "").trim();
+  if (!s) return "?";
+  const parts = s.replace(/[_-]+/g, " ").split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return s.slice(0, 2).toUpperCase();
 }
 
 async function loadComments(examId, idx){
@@ -1141,6 +1231,362 @@ async function reportComment(commentId){
   if (!sbClient || !currentUser) return;
   await sbClient.from("comment_reports").insert({ comment_id: commentId, reporter_id: currentUser.id });
 }
+
+
+// ---------- Admin Excel import (Supabase content_exams) ----------
+function isAdmin(){
+  if (!currentUser) return false;
+  const meta = currentUser.user_metadata || {};
+  return meta.role === "admin" || meta.is_admin === true;
+}
+
+function makeUploadId(niveau, concours, matiere, annee){
+  const raw = [niveau, concours, matiere, annee, Date.now()].join("|").toLowerCase();
+  let h = 0;
+  for (let i = 0; i < raw.length; i++) h = ((h << 5) - h + raw.charCodeAt(i)) | 0;
+  return "up-" + niveau + "-" + (Math.abs(h).toString(36)) + "-" + Date.now().toString(36);
+}
+
+function normHeader(s){
+  return String(s || "").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_\s]+/g, " ");
+}
+
+function pickCol(headers, aliases){
+  const map = {};
+  headers.forEach((h, i) => { map[normHeader(h)] = i; });
+  for (const a of aliases){
+    const k = normHeader(a);
+    if (map[k] !== undefined) return map[k];
+  }
+  // partial match
+  for (const [h, i] of Object.entries(map)){
+    for (const a of aliases){
+      if (h.includes(normHeader(a)) || normHeader(a).includes(h)) return i;
+    }
+  }
+  return -1;
+}
+
+function cell(row, idx){
+  if (idx < 0 || !row) return "";
+  const v = row[idx];
+  return v == null ? "" : String(v).trim();
+}
+
+/** Parse SheetJS workbook rows → exam objects for a niveau */
+function parseExcelToExams(workbook, niveau, defaults){
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  if (!rows.length) throw new Error("Fichier vide");
+  const headers = rows[0].map(String);
+  const iConc = pickCol(headers, ["concours", "exam", "examen"]);
+  const iMat = pickCol(headers, ["matiere", "matière", "subject", "filiere", "filière"]);
+  const iAnn = pickCol(headers, ["annee", "année", "year", "session"]);
+  const iNum = pickCol(headers, ["question number", "num", "n", "numero", "numéro", "#"]);
+  const iQ = pickCol(headers, ["question", "enonce", "énoncé", "texte", "text"]);
+  const iA = pickCol(headers, ["option a", "a", "choix a", "reponse a"]);
+  const iB = pickCol(headers, ["option b", "b", "choix b"]);
+  const iC = pickCol(headers, ["option c", "c", "choix c"]);
+  const iD = pickCol(headers, ["option d", "d", "choix d"]);
+  const iCorr = pickCol(headers, ["correct answer", "correct", "reponse", "réponse", "answer", "bonne reponse"]);
+  const iExpl = pickCol(headers, ["explanation", "explication", "corrige", "corrigé"]);
+
+  if (iQ < 0) throw new Error("Colonne « Question » introuvable");
+
+  const groups = new Map();
+  for (let r = 1; r < rows.length; r++){
+    const row = rows[r];
+    if (!row || !row.length) continue;
+    const qtext = cell(row, iQ);
+    if (!qtext) continue;
+    const concours = cell(row, iConc) || defaults.concours || "Import";
+    const matiere = cell(row, iMat) || defaults.matiere || (niveau === "bac3" ? "Épreuve" : "Général");
+    const annee = cell(row, iAnn) || defaults.annee || new Date().getFullYear().toString();
+    const key = concours + "||" + matiere + "||" + annee;
+    if (!groups.has(key)) groups.set(key, { concours, matiere, annee, questions: [] });
+
+    const optA = cell(row, iA), optB = cell(row, iB), optC = cell(row, iC), optD = cell(row, iD);
+    const hasOpts = !!(optA || optB || optC || optD);
+    const corrRaw = cell(row, iCorr);
+    const expl = cell(row, iExpl) || null;
+    const num = cell(row, iNum) || ("#" + (groups.get(key).questions.length + 1));
+
+    if (hasOpts || niveau === "bac"){
+      const options = [];
+      [["A", optA], ["B", optB], ["C", optC], ["D", optD]].forEach(([letter, text]) => {
+        if (text) options.push({ letter, text });
+      });
+      if (options.length < 2) continue;
+      let correct = (corrRaw || "").toUpperCase().replace(/[^A-D]/g, "").charAt(0) || null;
+      if (correct && !options.some(o => o.letter === correct)) correct = null;
+      groups.get(key).questions.push({
+        num: String(num),
+        text: qtext,
+        options,
+        correct,
+        explanation: expl
+      });
+    } else {
+      // libre (bac2 / master style)
+      groups.get(key).questions.push({
+        num: String(num),
+        text: qtext,
+        answer: corrRaw || expl || "",
+        correct: null,
+        explanation: expl
+      });
+    }
+  }
+
+  const exams = [];
+  for (const g of groups.values()){
+    if (!g.questions.length) continue;
+    const id = makeUploadId(niveau, g.concours, g.matiere, g.annee);
+    const nCorrected = g.questions.filter(q => q.correct || q.answer).length;
+    const type = g.questions.some(q => q.options && q.options.length) ? "qcm" : "libre";
+    const exam = {
+      id,
+      niveau,
+      concours: g.concours,
+      matiere: g.matiere,
+      annee: g.annee,
+      n: g.questions.length,
+      nCorrected,
+      n_corrected: nCorrected,
+      type,
+      source: "upload",
+      questions: g.questions
+    };
+    exams.push(exam);
+  }
+  if (!exams.length) throw new Error("Aucune question valide trouvée dans le fichier");
+  return exams;
+}
+
+function examToMeta(exam){
+  const meta = {
+    id: exam.id,
+    concours: exam.concours,
+    matiere: exam.matiere,
+    annee: exam.annee,
+    n: exam.n,
+    nCorrected: exam.nCorrected || exam.n_corrected || 0,
+    source: exam.source || "upload"
+  };
+  if (exam.type) meta.type = exam.type;
+  if (exam.cycle) meta.cycle = exam.cycle;
+  if (exam.filiere) meta.filiere = exam.filiere;
+  return meta;
+}
+
+function mergeUploadedIntoDb(niveau, rows){
+  const list = rows || [];
+  list.forEach(row => {
+    const exam = {
+      id: row.id,
+      concours: row.concours,
+      matiere: row.matiere || row.filiere || "",
+      annee: row.annee,
+      n: row.n,
+      nCorrected: row.n_corrected || row.nCorrected || 0,
+      type: row.type || "qcm",
+      source: row.source || "upload",
+      questions: row.questions || [],
+      cycle: row.cycle,
+      filiere: row.filiere || row.matiere
+    };
+    UPLOADED_BY_ID.set(exam.id, exam);
+    const meta = examToMeta(exam);
+    if (niveau === "bac" || niveau === "bac2" && false) {}
+    if (niveau === "bac"){
+      EXAMS_DB = EXAMS_DB.filter(e => e.id !== meta.id).concat([meta]);
+    } else if (niveau === "bac2"){
+      BAC2_DB = BAC2_DB.filter(e => e.id !== meta.id).concat([meta]);
+    } else if (niveau === "bac3"){
+      meta.cycle = row.cycle || "Secondaire";
+      meta.filiere = row.filiere || row.matiere || "";
+      BAC3_DB = BAC3_DB.filter(e => e.id !== meta.id).concat([meta]);
+    } else if (niveau === "master"){
+      MASTER_DB = MASTER_DB.filter(e => e.id !== meta.id).concat([meta]);
+    }
+  });
+}
+
+async function loadUploadedContent(){
+  if (!sbClient) return;
+  try{
+    const { data, error } = await sbClient.from("content_exams").select("*");
+    if (error) throw error;
+    const byNiv = { bac: [], bac2: [], bac3: [], master: [] };
+    (data || []).forEach(row => {
+      const n = row.niveau;
+      if (byNiv[n]) byNiv[n].push(row);
+    });
+    Object.keys(byNiv).forEach(n => mergeUploadedIntoDb(n, byNiv[n]));
+  }catch(e){
+    console.warn("loadUploadedContent", e);
+  }
+}
+
+async function saveExamsToSupabase(exams, niveau){
+  if (!sbClient || !currentUser || !isAdmin()) throw new Error("admin");
+  const rows = exams.map(e => ({
+    id: e.id,
+    niveau,
+    concours: e.concours,
+    matiere: e.matiere,
+    annee: e.annee,
+    n: e.n,
+    n_corrected: e.nCorrected || 0,
+    type: e.type || "qcm",
+    source: "upload",
+    questions: e.questions,
+    created_by: currentUser.id,
+    updated_at: new Date().toISOString()
+  }));
+  const { error } = await sbClient.from("content_exams").upsert(rows, { onConflict: "id" });
+  if (error) throw error;
+  mergeUploadedIntoDb(niveau, rows.map(r => ({ ...r, nCorrected: r.n_corrected })));
+  return rows.length;
+}
+
+async function deleteUploadedExam(id){
+  if (!sbClient || !isAdmin()) return;
+  const { error } = await sbClient.from("content_exams").delete().eq("id", id);
+  if (error) throw error;
+  UPLOADED_BY_ID.delete(id);
+  EXAMS_DB = EXAMS_DB.filter(e => e.id !== id);
+  BAC2_DB = BAC2_DB.filter(e => e.id !== id);
+  BAC3_DB = BAC3_DB.filter(e => e.id !== id);
+  MASTER_DB = MASTER_DB.filter(e => e.id !== id);
+}
+
+function ensureXlsx(){
+  return new Promise((resolve, reject) => {
+    if (window.XLSX) return resolve();
+    const s = document.createElement("script");
+    s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("SheetJS load failed"));
+    document.head.appendChild(s);
+  });
+}
+
+async function renderAdmin(){
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("admin_title")}`);
+  if (!currentUser){
+    app.innerHTML = `<div class="admin-panel"><h2>${t("admin_title")}</h2><p>${t("admin_need_login")}</p>
+      <button class="btn primary" id="adminLoginBtn" type="button">${t("auth_login")}</button></div>`;
+    const b = document.getElementById("adminLoginBtn");
+    if (b) b.onclick = openAuthModal;
+    return;
+  }
+  if (!isAdmin()){
+    app.innerHTML = `<div class="admin-panel"><h2>${t("admin_title")}</h2><p class="admin-error">${t("admin_denied")}</p>
+      <p class="hint">Compte : ${escapeHtml(currentUser.email || "")}</p></div>`;
+    return;
+  }
+
+  let uploaded = [];
+  try{
+    if (sbClient){
+      const { data } = await sbClient.from("content_exams").select("id,niveau,concours,matiere,annee,n,created_at").order("created_at", { ascending: false });
+      uploaded = data || [];
+    }
+  }catch(e){}
+
+  const listHtml = uploaded.length ? uploaded.map(u => `
+    <div class="exam-row">
+      <div class="left">
+        <span class="year">${escapeHtml(u.niveau)}</span>
+        <div>
+          <div class="exam-row-title">${escapeHtml(u.concours)} · ${escapeHtml(u.matiere)}</div>
+          <div class="n">${escapeHtml(formatAnnee(u.annee))} · ${u.n} Q · ${escapeHtml((u.created_at||"").slice(0,10))}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" data-del-upload="${escapeHtml(u.id)}">${t("admin_delete")}</button>
+      </div>
+    </div>`).join("") : `<div class="empty">${t("admin_empty_list")}</div>`;
+
+  app.innerHTML = `
+    <div class="admin-panel">
+      <h2>${t("admin_title")}</h2>
+      <p class="hint">${t("admin_hint")}</p>
+      <form id="adminUploadForm" class="admin-form">
+        <label class="auth-label">${t("admin_niveau")}</label>
+        <select id="adminNiveau" class="search-input auth-input" required>
+          <option value="bac">Bac / post-bac (QCM)</option>
+          <option value="bac2">Bac+2</option>
+          <option value="bac3">Enseignement (Bac+3)</option>
+          <option value="master">Master</option>
+        </select>
+        <label class="auth-label">${t("admin_concours")}</label>
+        <input id="adminConcours" class="search-input auth-input" type="text" placeholder="ex. ENSA" style="width:100%">
+        <label class="auth-label">${t("admin_matiere")}</label>
+        <input id="adminMatiere" class="search-input auth-input" type="text" placeholder="ex. Chimie" style="width:100%">
+        <label class="auth-label">${t("admin_annee")}</label>
+        <input id="adminAnnee" class="search-input auth-input" type="text" placeholder="ex. 2024" style="width:100%">
+        <label class="auth-label">${t("admin_file")}</label>
+        <input id="adminFile" type="file" accept=".xlsx,.xls,.csv" required>
+        <div id="adminStatus" class="admin-status" hidden></div>
+        <button class="btn primary" type="submit" id="adminSubmitBtn">${t("admin_upload")}</button>
+      </form>
+      <h3 style="margin-top:28px;">${t("admin_list")}</h3>
+      ${listHtml}
+    </div>`;
+
+  document.querySelectorAll("[data-del-upload]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm(t("admin_delete") + " ?")) return;
+      try{
+        await deleteUploadedExam(btn.dataset.delUpload);
+        renderAdmin();
+      }catch(e){ alert(e.message || t("admin_error")); }
+    });
+  });
+
+  const form = document.getElementById("adminUploadForm");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const status = document.getElementById("adminStatus");
+    const submit = document.getElementById("adminSubmitBtn");
+    const file = document.getElementById("adminFile").files[0];
+    if (!file) return;
+    status.hidden = false;
+    status.className = "admin-status";
+    status.textContent = t("admin_parsing");
+    submit.disabled = true;
+    try{
+      await ensureXlsx();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const niveau = document.getElementById("adminNiveau").value;
+      const defaults = {
+        concours: document.getElementById("adminConcours").value.trim(),
+        matiere: document.getElementById("adminMatiere").value.trim(),
+        annee: document.getElementById("adminAnnee").value.trim()
+      };
+      const exams = parseExcelToExams(wb, niveau, defaults);
+      status.textContent = t("admin_saving");
+      await saveExamsToSupabase(exams, niveau);
+      const q = exams.reduce((s, x) => s + x.n, 0);
+      status.className = "admin-status admin-ok";
+      status.textContent = t("admin_success").replace("{n}", exams.length).replace("{q}", q);
+      setTimeout(() => renderAdmin(), 800);
+    }catch(err){
+      console.warn(err);
+      status.className = "admin-status admin-error";
+      status.textContent = (err && err.message) ? err.message : t("admin_error");
+    }finally{
+      submit.disabled = false;
+    }
+  });
+}
+
 
 // ---------- Router ----------
 function parseHash(){
@@ -1243,6 +1689,7 @@ function route(){
   if (sessionKeyHandler){ document.removeEventListener("keydown", sessionKeyHandler); sessionKeyHandler = null; }
   const parts = parseHash();
   if (parts.length === 0) return renderHome();
+  if (parts[0] === "admin") return renderAdmin();
   if (parts[0] === "progression") return renderProgression();
   if (parts[0] === "mistakes") return renderMistakes();
   if (parts[0] === "inedit" && parts.length === 1) return renderInedit();
@@ -1614,10 +2061,9 @@ function renderProgression(){
     const totalCorrectable = rows.reduce((s,r)=>s+r.nCorrectable,0);
 
     const rowsHtml = rows.map(({exam, data, answered, nCorrect, nCorrectable}) => `
-      <div class="exam-row" style="flex-direction:column; align-items:stretch; gap:10px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+      <div class="exam-row">
           <div class="left">
-            ${exam.source === "suprepa" ? `<span class="badge-original">${t("inedit_badge")}</span>` : `<span class="year">${exam.annee}</span>`}
+            ${exam.source === "suprepa" ? `<span class="badge-original">${t("inedit_badge")}</span>` : `<span class="year">${formatAnnee(exam.annee)}</span>`}
             <div>
               <div style="font-weight:600;">${escapeHtml(exam.concours)} · ${escapeHtml(exam.matiere)}</div>
               <div class="n">${answered} / ${exam.n} ${currentLang === "ar" ? "تمت الإجابة عنها" : "répondues"}${data.finishedAt ? ` · ${t("row_finished")}` : ` · ${t("row_in_progress")}`}${nCorrectable ? ` · ${currentLang === "ar" ? "النتيجة" : "score"} ${nCorrect}/${nCorrectable}` : ""}</div>
@@ -1761,20 +2207,18 @@ function renderMatiere(concours, matiere){
     const progress = loadProgress(e.id);
     const answered = Object.keys(progress.answers||{}).length;
     return `
-      <div class="exam-row" style="flex-direction:column; align-items:stretch; gap:10px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+      <div class="exam-row">
           <div class="left">
-            <span class="year">${e.annee}</span>
+            <span class="year">${escapeHtml(formatAnnee(e.annee))}</span>
             <div>
-              <div style="font-weight:600; view-transition-name:exam-title-${e.id};">${escapeHtml(e.matiere)} ${e.annee}</div>
+              <div style="font-weight:600; view-transition-name:exam-title-${e.id};">${escapeHtml(e.matiere)} ${formatAnnee(e.annee)}</div>
               <div class="n">${nQuestions(e.n)}${answered ? ` · ${answered} ${currentLang === "ar" ? "تم إنجازها" : "traitées"}` : ""}</div>
             </div>
           </div>
           <div class="actions">
             <a class="btn" href="#/exam/${e.id}">${t("btn_open")}</a>
           </div>
-        </div>
-        ${answered ? `<div class="progress-track" style="margin-bottom:0;" role="progressbar" aria-valuenow="${answered}" aria-valuemin="0" aria-valuemax="${e.n}" aria-label="${answered}/${e.n}"><div class="progress-fill" style="width:${Math.round(answered/e.n*100)}%;"></div></div>` : ""}
+        ${answered ? `<div class="exam-row-progress progress-track" role="progressbar" aria-valuenow="${answered}" aria-valuemin="0" aria-valuemax="${e.n}" aria-label="${answered}/${e.n}"><div class="progress-fill" style="width:${Math.round(answered/e.n*100)}%;"></div></div>` : ""}
       </div>`;
   }).join("");
 
@@ -1844,20 +2288,18 @@ function renderIneditMatiere(concours, matiere){
     const progress = loadProgress(e.id);
     const answered = Object.keys(progress.answers||{}).length;
     return `
-      <div class="exam-row" style="flex-direction:column; align-items:stretch; gap:10px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+      <div class="exam-row">
           <div class="left">
             <span class="badge-original">${t("inedit_badge")}</span>
             <div>
-              <div style="font-weight:600; view-transition-name:exam-title-${e.id};">${escapeHtml(e.matiere)} — ${e.annee}</div>
+              <div style="font-weight:600; view-transition-name:exam-title-${e.id};">${escapeHtml(e.matiere)} — ${formatAnnee(e.annee)}</div>
               <div class="n">${nQuestions(e.n)}, ${t("corrige_100")}${answered ? ` · ${answered} ${currentLang === "ar" ? "تم إنجازها" : "traitées"}` : ""}</div>
             </div>
           </div>
           <div class="actions">
             <a class="btn" href="#/exam/${e.id}">${t("btn_open")}</a>
           </div>
-        </div>
-        ${answered ? `<div class="progress-track" style="margin-bottom:0;" role="progressbar" aria-valuenow="${answered}" aria-valuemin="0" aria-valuemax="${e.n}" aria-label="${answered}/${e.n}"><div class="progress-fill" style="width:${Math.round(answered/e.n*100)}%;"></div></div>` : ""}
+        ${answered ? `<div class="exam-row-progress progress-track" role="progressbar" aria-valuenow="${answered}" aria-valuemin="0" aria-valuemax="${e.n}" aria-label="${answered}/${e.n}"><div class="progress-fill" style="width:${Math.round(answered/e.n*100)}%;"></div></div>` : ""}
       </div>`;
   }).join("");
 
@@ -1943,7 +2385,7 @@ async function renderBac2Concours(concours){
   const rows = exams.map(e => `
     <div class="exam-row">
       <div class="left">
-        <span class="year">${escapeHtml(e.annee)}</span>
+        <span class="year">${escapeHtml(formatAnnee(e.annee))}</span>
         <div>
           <div style="font-weight:600;">${escapeHtml(e.matiere)}</div>
           <div class="n">${nQuestions(e.n)} · ${e.type === "qcm" ? t("bac2_type_qcm") : t("bac2_free_response")}</div>
@@ -1990,7 +2432,7 @@ async function renderMasterConcours(concours){
   const rows = exams.map(e => `
     <div class="exam-row">
       <div class="left">
-        <span class="year">${escapeHtml(e.annee)}</span>
+        <span class="year">${escapeHtml(formatAnnee(e.annee))}</span>
         <div>
           <div style="font-weight:600;">${escapeHtml(e.matiere)}</div>
           <div class="n">${nQuestions(e.n)} · ${e.type === "qcm" ? t("bac2_type_qcm") : t("bac2_free_response")}</div>
@@ -2396,7 +2838,7 @@ async function renderBac3Filiere(cycleSlug, filiere){
   const rows = exams.map(e => `
     <div class="exam-row">
       <div class="left">
-        <span class="year">${escapeHtml(e.annee)}</span>
+        <span class="year">${escapeHtml(formatAnnee(e.annee))}</span>
         <div>
           <div style="font-weight:600;">${escapeHtml(filiere)}</div>
           <div class="n">${nQuestions(e.n)}</div>
@@ -2575,11 +3017,11 @@ async function renderSession(examId, mode, startIdx){
         const renderOne = (c, isReply) => {
           const mine = currentUser && c.user_id === currentUser.id;
           const uname = (c.display_name || "Étudiant").trim();
-          const initial = (uname.charAt(0) || "?").toUpperCase();
+          const initials = getInitials(uname);
           return `
           <div class="comment-item${isReply ? " comment-reply" : ""}${mine ? " comment-mine" : ""}">
             <div class="comment-meta">
-              <span class="comment-avatar" aria-hidden="true">${escapeHtml(initial)}</span>
+              <span class="comment-avatar" title="${escapeHtml(uname)}" aria-label="${escapeHtml(uname)}">${escapeHtml(initials)}</span>
               <b class="comment-user">${escapeHtml(uname)}</b>
               ${mine ? `<span class="comment-you">${t("comments_you")}</span>` : ""}
               <span class="comment-date">${dateFmt(c.created_at)}</span>
@@ -2982,7 +3424,7 @@ boot();
     }
     results.innerHTML = list.map(e => `
       <a href="#/exam/${e.id}">
-        <div>${escapeHtml(e.concours)} · ${escapeHtml(e.matiere)} ${e.annee}</div>
+        <div>${escapeHtml(e.concours)} · ${escapeHtml(e.matiere)} ${formatAnnee(e.annee)}</div>
         <div class="sr-meta">${nQuestions(e.n)}${e.nCorrected ? ` · ${e.nCorrected} ${currentLang === "ar" ? "مصححة" : "corrigées"}` : ""}</div>
       </a>`).join("");
     results.classList.add("open");
