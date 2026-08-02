@@ -986,13 +986,57 @@ function renderAuthArea(){
   const el = document.getElementById("authArea");
   if (!el) return;
   if (currentUser){
+    const email = currentUser.email || t("auth_connected");
+    const label = getUserDisplayName(currentUser);
+    const initials = getInitials(label || email);
     el.innerHTML = `
-      <div class="auth-user">
-        ${isAdmin() ? `<a class="auth-admin-link" href="#/admin">${t("admin_link")}</a>` : ""}
-        <span class="auth-email">${escapeHtml(currentUser.email || t("auth_connected"))}</span>
-        <button id="authSignOutBtn" type="button">${t("auth_signout")}</button>
+      <div class="auth-menu" id="authMenu">
+        <button type="button" class="auth-avatar-btn" id="authMenuBtn" aria-haspopup="true" aria-expanded="false" title="${escapeHtml(email)}">
+          <span class="auth-avatar" aria-hidden="true">${escapeHtml(initials)}</span>
+        </button>
+        <div class="auth-dropdown" id="authDropdown" hidden>
+          <div class="auth-dropdown-email">${escapeHtml(email)}</div>
+          ${isAdmin() ? `<a class="auth-dropdown-item" href="#/admin">${t("admin_link")}</a>` : ""}
+          <button type="button" class="auth-dropdown-item auth-dropdown-danger" id="authSignOutBtn">${t("auth_signout")}</button>
+        </div>
       </div>`;
-    document.getElementById("authSignOutBtn").addEventListener("click", () => sbClient && sbClient.auth.signOut());
+    const menu = document.getElementById("authMenu");
+    const btn = document.getElementById("authMenuBtn");
+    const dd = document.getElementById("authDropdown");
+    const close = () => {
+      if (!dd) return;
+      dd.hidden = true;
+      if (btn) btn.setAttribute("aria-expanded", "false");
+    };
+    const open = () => {
+      if (!dd) return;
+      dd.hidden = false;
+      if (btn) btn.setAttribute("aria-expanded", "true");
+    };
+    if (btn){
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        dd.hidden ? open() : close();
+      });
+    }
+    document.getElementById("authSignOutBtn")?.addEventListener("click", () => {
+      close();
+      sbClient && sbClient.auth.signOut();
+    });
+    // close on outside click / escape (one listener per render is ok; previous nodes gone)
+    const onDoc = (e) => {
+      if (!menu) return;
+      if (!menu.contains(e.target)) close();
+    };
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    document.addEventListener("click", onDoc);
+    document.addEventListener("keydown", onKey);
+    // store for cleanup if needed — lightweight: only one active auth menu
+    if (window.__authMenuCleanup) window.__authMenuCleanup();
+    window.__authMenuCleanup = () => {
+      document.removeEventListener("click", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
   } else {
     el.innerHTML = `<button class="auth-btn" id="authOpenBtn" type="button" title="${escapeHtml(t("auth_connect_title"))}">${t("auth_login")}</button>`;
     document.getElementById("authOpenBtn").addEventListener("click", openAuthModal);
