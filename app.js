@@ -1510,7 +1510,8 @@ async function loadUploadedContent(){
 
 async function saveExamsToSupabase(exams, niveau){
   if (!sbClient || !currentUser || !isAdmin()) throw new Error("admin");
-  const baseOrder = Date.now();
+  // sort_order must fit Postgres integer (max ~2e9). Use compact ranks.
+  const baseOrder = Math.floor(Date.now() / 1000) % 1000000000; // seconds, clipped
   const rows = exams.map((e, i) => ({
     id: e.id,
     niveau,

@@ -3324,6 +3324,56 @@ html[dir="rtl"] .auth-dropdown{
   .admin-exam-card .btn{ grid-column: 1 / -1; }
 }
 
+
+/* Admin form fields — visible click targets */
+.admin-form .auth-input,
+.admin-form .search-input,
+.admin-form select.auth-input,
+.admin-form input.auth-input,
+.admin-form input[type="text"],
+.admin-form select{
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 14px !important;
+  border: 1.5px solid #B8CCE4 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: var(--ink) !important;
+  font-size: 14.5px !important;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(15,42,74,.04);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.admin-form .auth-input:hover,
+.admin-form select.auth-input:hover{
+  border-color: #8EB0D8 !important;
+}
+.admin-form .auth-input:focus,
+.admin-form select.auth-input:focus,
+.admin-form input:focus{
+  outline: none !important;
+  border-color: var(--brand-blue, #1660D1) !important;
+  box-shadow: 0 0 0 3px rgba(22,96,209,.18) !important;
+}
+.admin-form .auth-label{
+  display: block;
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink-soft);
+}
+.admin-form .admin-fields-row .auth-label{ margin-top: 8px; }
+.admin-form .admin-fields-row > div{ min-width: 0; }
+.admin-list-card select.auth-input{
+  min-height: 40px;
+  border: 1.5px solid #B8CCE4 !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  padding: 8px 12px !important;
+}
+
 </style>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 </head>
