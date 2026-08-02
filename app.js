@@ -9,6 +9,21 @@ function escapeHtml(str){
   }[c]));
 }
 
+/** Escape HTML, then turn image URLs into <img> (http/https ending with image ext or any https URL marked) */
+function formatRichText(str){
+  let s = escapeHtml(str == null ? "" : String(str));
+  // Markdown-ish ![alt](url)
+  s = s.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi, (_, alt, url) =>
+    `<img class="q-img" src="${url}" alt="${alt || "figure"}" loading="lazy" />`);
+  // Bare image URLs
+  s = s.replace(/(https?:\/\/[^\s<]+\.(?:png|jpe?g|gif|webp|svg)(?:\?[^\s<]*)?)/gi, (url) =>
+    `<img class="q-img" src="${url}" alt="figure" loading="lazy" />`);
+  // Newlines
+  s = s.replace(/\n/g, "<br>");
+  return s;
+}
+
+
 const prefersReducedMotion = () =>
   window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -1328,10 +1343,7 @@ function cell(row, idx){
 }
 
 /** Parse SheetJS workbook rows → exam objects for a niveau */
-function parseExcelToExams(workbook, niveau, defaults){
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+function parseExcelSheetRows(rows, niveau, defaults, forceMode){
   if (!rows.length) throw new Error("Fichier vide");
   const headers = rows[0].map(String);
   const iConc = pickCol(headers, ["concours", "exam", "examen"]);
@@ -1366,29 +1378,28 @@ function parseExcelToExams(workbook, niveau, defaults){
     const expl = cell(row, iExpl) || null;
     const num = cell(row, iNum) || ("#" + (groups.get(key).questions.length + 1));
 
-    if (hasOpts || niveau === "bac"){
+    const preferLibre = forceMode === "libre" || (!forceMode && !hasOpts && niveau !== "bac");
+    if (!preferLibre){
       const options = [];
       [["A", optA], ["B", optB], ["C", optC], ["D", optD]].forEach(([letter, text]) => {
         if (text) options.push({ letter, text });
       });
-      if (options.length < 2) continue;
+      if (options.length < 2){
+        if (forceMode === "qcm") continue;
+        // fallback libre if incomplete options
+        groups.get(key).questions.push({
+          num: String(num), text: qtext, answer: corrRaw || expl || "", correct: null, explanation: expl
+        });
+        continue;
+      }
       let correct = (corrRaw || "").toUpperCase().replace(/[^A-D]/g, "").charAt(0) || null;
       if (correct && !options.some(o => o.letter === correct)) correct = null;
       groups.get(key).questions.push({
-        num: String(num),
-        text: qtext,
-        options,
-        correct,
-        explanation: expl
+        num: String(num), text: qtext, options, correct, explanation: expl
       });
     } else {
-      // libre (bac2 / master style)
       groups.get(key).questions.push({
-        num: String(num),
-        text: qtext,
-        answer: corrRaw || expl || "",
-        correct: null,
-        explanation: expl
+        num: String(num), text: qtext, answer: corrRaw || expl || "", correct: null, explanation: expl
       });
     }
   }
@@ -1399,23 +1410,35 @@ function parseExcelToExams(workbook, niveau, defaults){
     const id = makeUploadId(niveau, g.concours, g.matiere, g.annee);
     const nCorrected = g.questions.filter(q => q.correct || q.answer).length;
     const type = g.questions.some(q => q.options && q.options.length) ? "qcm" : "libre";
-    const exam = {
-      id,
-      niveau,
-      concours: g.concours,
-      matiere: g.matiere,
-      annee: g.annee,
-      n: g.questions.length,
-      nCorrected,
-      n_corrected: nCorrected,
-      type,
-      source: "upload",
-      questions: g.questions
-    };
-    exams.push(exam);
+    exams.push({
+      id, niveau, concours: g.concours, matiere: g.matiere, annee: g.annee,
+      n: g.questions.length, nCorrected, n_corrected: nCorrected, type, source: "upload", questions: g.questions
+    });
   }
-  if (!exams.length) throw new Error("Aucune question valide trouvée dans le fichier");
   return exams;
+}
+
+function parseExcelToExams(workbook, niveau, defaults, opts){
+  opts = opts || {};
+  const forceMode = opts.forceMode || null; // "qcm" | "libre" | null
+  const sheetNames = opts.sheetName
+    ? [opts.sheetName]
+    : (opts.allSheets ? workbook.SheetNames : [workbook.SheetNames[0]]);
+  let all = [];
+  const errors = [];
+  sheetNames.forEach(name => {
+    const sheet = workbook.Sheets[name];
+    if (!sheet) return;
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    try{
+      const part = parseExcelSheetRows(rows, niveau, defaults, forceMode);
+      all = all.concat(part);
+    }catch(e){
+      errors.push((name || "?") + ": " + (e.message || e));
+    }
+  });
+  if (!all.length) throw new Error(errors[0] || "Aucune question valide trouvée dans le fichier");
+  return all;
 }
 
 function examToMeta(exam){
@@ -1470,7 +1493,9 @@ function mergeUploadedIntoDb(niveau, rows){
 async function loadUploadedContent(){
   if (!sbClient) return;
   try{
-    const { data, error } = await sbClient.from("content_exams").select("*");
+    const { data, error } = await sbClient.from("content_exams").select("*")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
     if (error) throw error;
     const byNiv = { bac: [], bac2: [], bac3: [], master: [] };
     (data || []).forEach(row => {
@@ -1485,7 +1510,8 @@ async function loadUploadedContent(){
 
 async function saveExamsToSupabase(exams, niveau){
   if (!sbClient || !currentUser || !isAdmin()) throw new Error("admin");
-  const rows = exams.map(e => ({
+  const baseOrder = Date.now();
+  const rows = exams.map((e, i) => ({
     id: e.id,
     niveau,
     concours: e.concours,
@@ -1496,6 +1522,7 @@ async function saveExamsToSupabase(exams, niveau){
     type: e.type || "qcm",
     source: "upload",
     questions: e.questions,
+    sort_order: baseOrder + i,
     created_by: currentUser.id,
     updated_at: new Date().toISOString()
   }));
@@ -1527,69 +1554,313 @@ function ensureXlsx(){
   });
 }
 
+
+async function reorderUploadedExams(idsInOrder){
+  if (!sbClient || !isAdmin() || !idsInOrder.length) return;
+  // sequential updates so RLS admin policy applies
+  for (let i = 0; i < idsInOrder.length; i++){
+    const { error } = await sbClient.from("content_exams")
+      .update({ sort_order: (i + 1) * 10, updated_at: new Date().toISOString() })
+      .eq("id", idsInOrder[i]);
+    if (error) throw error;
+  }
+}
+
+function wireAdminListDnD(){
+  const body = document.getElementById("adminListBody");
+  if (!body) return;
+  let dragEl = null;
+
+  body.querySelectorAll(".admin-exam-card").forEach(card => {
+    card.addEventListener("dragstart", (e) => {
+      dragEl = card;
+      card.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try{ e.dataTransfer.setData("text/plain", card.dataset.id || ""); }catch(_){}
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("is-dragging");
+      body.querySelectorAll(".admin-exam-card").forEach(c => c.classList.remove("drag-over"));
+      dragEl = null;
+    });
+    card.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const over = e.currentTarget;
+      if (!dragEl || over === dragEl) return;
+      over.classList.add("drag-over");
+      const rect = over.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      if (before) body.insertBefore(dragEl, over);
+      else body.insertBefore(dragEl, over.nextSibling);
+    });
+    card.addEventListener("dragleave", (e) => {
+      e.currentTarget.classList.remove("drag-over");
+    });
+    card.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      body.querySelectorAll(".admin-exam-card").forEach(c => c.classList.remove("drag-over"));
+      const ids = [...body.querySelectorAll(".admin-exam-card")].map(c => c.dataset.id).filter(Boolean);
+      try{
+        await reorderUploadedExams(ids);
+        // soft toast
+        const tip = document.createElement("div");
+        tip.className = "admin-status admin-ok";
+        tip.style.marginTop = "8px";
+        tip.textContent = currentLang === "ar" ? "تم حفظ الترتيب" : "Ordre enregistré";
+        body.parentElement.appendChild(tip);
+        setTimeout(() => tip.remove(), 1600);
+      }catch(err){
+        console.warn(err);
+        alert(err.message || (currentLang === "ar" ? "تعذّر حفظ الترتيب" : "Impossible d'enregistrer l'ordre"));
+      }
+    });
+  });
+}
+
 async function renderAdmin(){
   setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("admin_title")}`);
   if (!currentUser){
-    app.innerHTML = `<div class="admin-panel"><h2>${t("admin_title")}</h2><p>${t("admin_need_login")}</p>
-      <button class="btn primary" id="adminLoginBtn" type="button">${t("auth_login")}</button></div>`;
-    const b = document.getElementById("adminLoginBtn");
-    if (b) b.onclick = openAuthModal;
+    app.innerHTML = `<div class="admin-panel"><div class="admin-hero"><h2>${t("admin_title")}</h2><p>${t("admin_need_login")}</p>
+      <button class="btn primary" id="adminLoginBtn" type="button">${t("auth_login")}</button></div></div>`;
+    document.getElementById("adminLoginBtn")?.addEventListener("click", openAuthModal);
     return;
   }
   if (!isAdmin()){
-    app.innerHTML = `<div class="admin-panel"><h2>${t("admin_title")}</h2><p class="admin-error">${t("admin_denied")}</p>
-      <p class="hint">Compte : ${escapeHtml(currentUser.email || "")}</p></div>`;
+    app.innerHTML = `<div class="admin-panel"><div class="admin-hero"><h2>${t("admin_title")}</h2>
+      <p class="admin-error">${t("admin_denied")}</p>
+      <p class="hint">Compte : ${escapeHtml(currentUser.email || "")}</p></div></div>`;
     return;
   }
 
   let uploaded = [];
   try{
     if (sbClient){
-      const { data } = await sbClient.from("content_exams").select("id,niveau,concours,matiere,annee,n,created_at").order("created_at", { ascending: false });
+      const { data } = await sbClient.from("content_exams")
+        .select("id,niveau,concours,matiere,annee,n,type,created_at,sort_order")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false });
       uploaded = data || [];
     }
   }catch(e){}
 
+  const stats = {
+    total: uploaded.length,
+    q: uploaded.reduce((s,u) => s + (u.n || 0), 0),
+    bac: uploaded.filter(u => u.niveau === "bac").length,
+    bac2: uploaded.filter(u => u.niveau === "bac2").length,
+    bac3: uploaded.filter(u => u.niveau === "bac3").length,
+    master: uploaded.filter(u => u.niveau === "master").length
+  };
+
   const listHtml = uploaded.length ? uploaded.map(u => `
-    <div class="exam-row">
-      <div class="left">
-        <span class="year">${escapeHtml(u.niveau)}</span>
-        <div>
-          <div class="exam-row-title">${escapeHtml(u.concours)} · ${escapeHtml(u.matiere)}</div>
-          <div class="n">${escapeHtml(formatAnnee(u.annee))} · ${u.n} Q · ${escapeHtml((u.created_at||"").slice(0,10))}</div>
+    <div class="admin-exam-card" draggable="true" data-id="${escapeHtml(u.id)}" data-niv="${escapeHtml(u.niveau)}">
+      <button type="button" class="admin-drag-handle" title="Réordonner" aria-label="Réordonner">⋮⋮</button>
+      <div class="admin-exam-main">
+        <span class="admin-pill">${escapeHtml(u.niveau)}</span>
+        ${u.type === "libre" ? `<span class="admin-pill admin-pill-soft">libre</span>` : `<span class="admin-pill admin-pill-soft">QCM</span>`}
+        <div class="admin-exam-titles">
+          <strong>${escapeHtml(u.concours)}</strong>
+          <span>${escapeHtml(u.matiere)} · ${escapeHtml(formatAnnee(u.annee))}</span>
         </div>
       </div>
-      <div class="actions">
-        <button type="button" class="btn" data-del-upload="${escapeHtml(u.id)}">${t("admin_delete")}</button>
-      </div>
+      <div class="admin-exam-meta">${u.n} Q · ${(u.created_at||"").slice(0,10)}</div>
+      <button type="button" class="btn" data-del-upload="${escapeHtml(u.id)}">${t("admin_delete")}</button>
     </div>`).join("") : `<div class="empty">${t("admin_empty_list")}</div>`;
 
   app.innerHTML = `
     <div class="admin-panel">
-      <h2>${t("admin_title")}</h2>
-      <p class="hint">${t("admin_hint")}</p>
-      <form id="adminUploadForm" class="admin-form">
-        <label class="auth-label">${t("admin_niveau")}</label>
-        <select id="adminNiveau" class="search-input auth-input" required>
-          <option value="bac">Bac / post-bac (QCM)</option>
-          <option value="bac2">Bac+2</option>
-          <option value="bac3">Enseignement (Bac+3)</option>
-          <option value="master">Master</option>
-        </select>
-        <label class="auth-label">${t("admin_concours")}</label>
-        <input id="adminConcours" class="search-input auth-input" type="text" placeholder="ex. ENSA" style="width:100%">
-        <label class="auth-label">${t("admin_matiere")}</label>
-        <input id="adminMatiere" class="search-input auth-input" type="text" placeholder="ex. Chimie" style="width:100%">
-        <label class="auth-label">${t("admin_annee")}</label>
-        <input id="adminAnnee" class="search-input auth-input" type="text" placeholder="ex. 2024" style="width:100%">
-        <label class="auth-label">${t("admin_file")}</label>
-        <input id="adminFile" type="file" accept=".xlsx,.xls,.csv" required>
-        <div id="adminStatus" class="admin-status" hidden></div>
-        <button class="btn primary" type="submit" id="adminSubmitBtn">${t("admin_upload")}</button>
-      </form>
-      <h3 style="margin-top:28px;">${t("admin_list")}</h3>
-      ${listHtml}
+      <div class="admin-hero">
+        <h2>${t("admin_title")}</h2>
+        <p class="hint">${currentLang === "ar"
+          ? "استورد ملف Excel — معاينة ثم نشر. الروابط للصور (png/jpg) تظهر في الأسئلة."
+          : "Importe un Excel, prévisualise, puis publie. Les URLs d'images (png/jpg/webp) s'affichent dans les questions."}</p>
+        <div class="admin-stats">
+          <div class="admin-stat"><b>${stats.total}</b><span>imports</span></div>
+          <div class="admin-stat"><b>${stats.q}</b><span>questions</span></div>
+          <div class="admin-stat"><b>${stats.bac}</b><span>bac</span></div>
+          <div class="admin-stat"><b>${stats.bac2}</b><span>bac+2</span></div>
+          <div class="admin-stat"><b>${stats.master}</b><span>master</span></div>
+        </div>
+      </div>
+
+      <div class="admin-grid">
+        <form id="adminUploadForm" class="admin-form admin-card">
+          <h3>${currentLang === "ar" ? "استيراد جديد" : "Nouvel import"}</h3>
+
+          <div class="admin-seg" role="group" aria-label="Format">
+            <button type="button" class="admin-seg-btn active" data-mode="qcm">QCM (A–D)</button>
+            <button type="button" class="admin-seg-btn" data-mode="libre">${currentLang === "ar" ? "أسئلة حرة" : "Questions libres"}</button>
+          </div>
+          <input type="hidden" id="adminForceMode" value="qcm">
+
+          <label class="auth-label">${t("admin_niveau")}</label>
+          <select id="adminNiveau" class="search-input auth-input" required>
+            <option value="bac">Bac / post-bac</option>
+            <option value="bac2">Bac+2</option>
+            <option value="bac3">Enseignement (Bac+3)</option>
+            <option value="master">Master</option>
+          </select>
+
+          <div class="admin-fields-row">
+            <div>
+              <label class="auth-label">${t("admin_concours")}</label>
+              <input id="adminConcours" class="search-input auth-input" type="text" placeholder="ENSA" style="width:100%">
+            </div>
+            <div>
+              <label class="auth-label">${t("admin_matiere")}</label>
+              <input id="adminMatiere" class="search-input auth-input" type="text" placeholder="Chimie" style="width:100%">
+            </div>
+            <div>
+              <label class="auth-label">${t("admin_annee")}</label>
+              <input id="adminAnnee" class="search-input auth-input" type="text" placeholder="2024" style="width:100%">
+            </div>
+          </div>
+
+          <label class="auth-label">${t("admin_file")}</label>
+          <div class="admin-file-zone" id="adminFileZone">
+            <input id="adminFile" type="file" accept=".xlsx,.xls,.csv" required>
+            <p id="adminFileLabel">${currentLang === "ar" ? "اسحب الملف أو انقر للاختيار" : "Glisse un fichier ou clique pour choisir"}</p>
+          </div>
+
+          <label class="auth-label">${currentLang === "ar" ? "ورقة Excel" : "Feuille Excel"}</label>
+          <select id="adminSheet" class="search-input auth-input" disabled>
+            <option value="">${currentLang === "ar" ? "— بعد اختيار الملف —" : "— après choix du fichier —"}</option>
+          </select>
+          <label class="admin-check"><input type="checkbox" id="adminAllSheets"> ${currentLang === "ar" ? "كل الأوراق" : "Toutes les feuilles"}</label>
+
+          <div id="adminStatus" class="admin-status" hidden></div>
+          <div id="adminPreview" class="admin-preview" hidden></div>
+
+          <div class="admin-actions">
+            <button class="btn" type="button" id="adminPreviewBtn">${currentLang === "ar" ? "معاينة" : "Prévisualiser"}</button>
+            <button class="btn primary" type="submit" id="adminSubmitBtn">${t("admin_upload")}</button>
+          </div>
+          <p class="hint admin-hint-cols">${t("admin_hint")}</p>
+        </form>
+
+        <div class="admin-card admin-list-card">
+          <div class="admin-list-head">
+            <h3>${t("admin_list")}</h3>
+            <select id="adminFilterNiv" class="search-input auth-input" style="max-width:140px">
+              <option value="">${currentLang === "ar" ? "الكل" : "Tous"}</option>
+              <option value="bac">bac</option>
+              <option value="bac2">bac2</option>
+              <option value="bac3">bac3</option>
+              <option value="master">master</option>
+            </select>
+          </div>
+          <div id="adminListBody">${listHtml}</div>
+        </div>
+      </div>
     </div>`;
+
+  // Segment QCM / libre
+  const forceInput = document.getElementById("adminForceMode");
+  document.querySelectorAll(".admin-seg-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".admin-seg-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      forceInput.value = btn.dataset.mode;
+      const niv = document.getElementById("adminNiveau");
+      if (btn.dataset.mode === "libre" && niv.value === "bac") niv.value = "bac2";
+      if (btn.dataset.mode === "qcm" && (niv.value === "bac2" || niv.value === "master")) { /* keep */ }
+    });
+  });
+
+  // File label + sheet list
+  const fileInput = document.getElementById("adminFile");
+  const fileLabel = document.getElementById("adminFileLabel");
+  const sheetSel = document.getElementById("adminSheet");
+  let cachedWb = null;
+
+  async function readWb(){
+    const file = fileInput.files[0];
+    if (!file) throw new Error(currentLang === "ar" ? "اختر ملفاً" : "Choisis un fichier");
+    await ensureXlsx();
+    const buf = await file.arrayBuffer();
+    return XLSX.read(buf, { type: "array" });
+  }
+
+  fileInput.addEventListener("change", async () => {
+    const f = fileInput.files[0];
+    fileLabel.textContent = f ? f.name : (currentLang === "ar" ? "اسحب الملف أو انقر" : "Glisse un fichier ou clique");
+    sheetSel.innerHTML = "";
+    cachedWb = null;
+    if (!f){ sheetSel.disabled = true; return; }
+    try{
+      cachedWb = await readWb();
+      cachedWb.SheetNames.forEach((name, i) => {
+        const o = document.createElement("option");
+        o.value = name;
+        o.textContent = name;
+        if (i === 0) o.selected = true;
+        sheetSel.appendChild(o);
+      });
+      sheetSel.disabled = false;
+    }catch(e){
+      sheetSel.disabled = true;
+    }
+  });
+
+  function getDefaults(){
+    return {
+      concours: document.getElementById("adminConcours").value.trim(),
+      matiere: document.getElementById("adminMatiere").value.trim(),
+      annee: document.getElementById("adminAnnee").value.trim()
+    };
+  }
+  function getParseOpts(){
+    return {
+      forceMode: document.getElementById("adminForceMode").value || null,
+      sheetName: document.getElementById("adminAllSheets").checked ? null : (sheetSel.value || null),
+      allSheets: document.getElementById("adminAllSheets").checked
+    };
+  }
+
+  function showPreview(exams){
+    const box = document.getElementById("adminPreview");
+    box.hidden = false;
+    const q = exams.reduce((s,e) => s + e.n, 0);
+    const sample = exams[0]?.questions?.[0];
+    box.innerHTML = `
+      <div class="admin-preview-head">${exams.length} examen(s) · ${q} question(s)</div>
+      ${exams.map(e => `
+        <div class="admin-preview-exam">
+          <strong>${escapeHtml(e.concours)}</strong> · ${escapeHtml(e.matiere)} · ${escapeHtml(e.annee)}
+          <span class="admin-pill admin-pill-soft">${e.type}</span>
+          <span class="hint">${e.n} Q · ${e.nCorrected} corrigées</span>
+        </div>`).join("")}
+      ${sample ? `<div class="admin-preview-sample"><span class="hint">Aperçu Q1</span><div class="qtext"><p>${formatRichText(sample.text)}</p></div>
+        ${sample.options ? sample.options.map(o => `<div class="admin-opt">${o.letter}. ${formatRichText(o.text)}</div>`).join("") : `<div class="hint">${escapeHtml(sample.answer||"")}</div>`}
+      </div>` : ""}`;
+  }
+
+  document.getElementById("adminPreviewBtn")?.addEventListener("click", async () => {
+    const status = document.getElementById("adminStatus");
+    status.hidden = false;
+    status.className = "admin-status";
+    status.textContent = t("admin_parsing");
+    try{
+      if (!cachedWb) cachedWb = await readWb();
+      const exams = parseExcelToExams(cachedWb, document.getElementById("adminNiveau").value, getDefaults(), getParseOpts());
+      status.hidden = true;
+      showPreview(exams);
+    }catch(err){
+      status.className = "admin-status admin-error";
+      status.textContent = err.message || t("admin_error");
+      document.getElementById("adminPreview").hidden = true;
+    }
+  });
+
+  wireAdminListDnD();
+
+  document.getElementById("adminFilterNiv")?.addEventListener("change", (e) => {
+    const v = e.target.value;
+    document.querySelectorAll(".admin-exam-card").forEach(card => {
+      card.style.display = (!v || card.dataset.niv === v) ? "" : "none";
+    });
+  });
 
   document.querySelectorAll("[data-del-upload]").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -1601,34 +1872,25 @@ async function renderAdmin(){
     });
   });
 
-  const form = document.getElementById("adminUploadForm");
-  form.addEventListener("submit", async (e) => {
+  document.getElementById("adminUploadForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const status = document.getElementById("adminStatus");
     const submit = document.getElementById("adminSubmitBtn");
-    const file = document.getElementById("adminFile").files[0];
-    if (!file) return;
     status.hidden = false;
     status.className = "admin-status";
     status.textContent = t("admin_parsing");
     submit.disabled = true;
     try{
-      await ensureXlsx();
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+      if (!cachedWb) cachedWb = await readWb();
       const niveau = document.getElementById("adminNiveau").value;
-      const defaults = {
-        concours: document.getElementById("adminConcours").value.trim(),
-        matiere: document.getElementById("adminMatiere").value.trim(),
-        annee: document.getElementById("adminAnnee").value.trim()
-      };
-      const exams = parseExcelToExams(wb, niveau, defaults);
+      const exams = parseExcelToExams(cachedWb, niveau, getDefaults(), getParseOpts());
+      showPreview(exams);
       status.textContent = t("admin_saving");
       await saveExamsToSupabase(exams, niveau);
       const q = exams.reduce((s, x) => s + x.n, 0);
       status.className = "admin-status admin-ok";
       status.textContent = t("admin_success").replace("{n}", exams.length).replace("{q}", q);
-      setTimeout(() => renderAdmin(), 800);
+      setTimeout(() => renderAdmin(), 900);
     }catch(err){
       console.warn(err);
       status.className = "admin-status admin-error";
@@ -1639,6 +1901,7 @@ async function renderAdmin(){
   });
 }
 
+// ---------- Router
 
 // ---------- Router ----------
 function parseHash(){
@@ -2195,7 +2458,7 @@ function renderMistakes(){
             <span class="qnum" style="margin-bottom:0;">${escapeHtml(m.exam.concours)} · ${escapeHtml(m.exam.matiere)} · ${m.q.num}</span>
             <a class="btn" href="#/exam/${m.exam.id}/${m.mode}/${m.idx}">${t("btn_review")}</a>
           </div>
-          <div class="qtext"><p>${escapeHtml(m.q.text)}</p></div>
+          <div class="qtext"><p>${formatRichText(m.q.text)}</p></div>
           <div class="notice" style="border-color:var(--red);">
             <div>${currentLang === "ar" ? "إجابتك" : "Ta réponse"} : <b style="color:var(--red);">${m.given} — ${escapeHtml(givenOpt ? givenOpt.text : "")}</b></div>
             <div style="margin-top:4px;">${currentLang === "ar" ? "الإجابة الصحيحة" : "Réponse correcte"} : <b style="color:var(--green);">${m.correct} — ${escapeHtml(correctOpt ? correctOpt.text : "")}</b></div>
@@ -2538,7 +2801,7 @@ async function renderBac2Session(examId, startIdx){
           if (o.letter === selected) cls += " selected";
         }
         return `<button class="${cls}" data-letter="${o.letter}" ${selected ? "disabled" : ""}>
-          <span class="letter">${o.letter}</span><span>${escapeHtml(o.text)}</span>
+          <span class="letter">${o.letter}</span><span>${formatRichText(o.text)}</span>
         </button>`;
       }).join("");
       let correctionHtml = "";
@@ -2566,7 +2829,7 @@ async function renderBac2Session(examId, startIdx){
         <div class="progress-track"><div class="progress-fill" style="width:${(state.idx+1)/total*100}%"></div></div>
         <div class="question-card">
           <span class="qnum">${q.num}</span>
-          <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+          <div class="qtext"><p>${formatRichText(q.text)}</p></div>
           <div class="options">${optionsHtml}</div>
           ${correctionHtml}
         </div>
@@ -2616,7 +2879,7 @@ async function renderBac2Session(examId, startIdx){
 
         <div class="question-card">
           <span class="qnum">${q.num}</span>
-          <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+          <div class="qtext"><p>${formatRichText(q.text)}</p></div>
           <textarea id="bac2Answer" rows="6" placeholder="${escapeHtml(t("bac2_placeholder"))}"
             style="width:100%; font-family:var(--font-body); font-size:14.5px; padding:14px; border-radius:var(--radius); border:1px solid var(--line); background:var(--paper); color:var(--ink); resize:vertical;">${escapeHtml(draft)}</textarea>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
@@ -2698,7 +2961,7 @@ async function renderMasterSession(examId, startIdx){
           if (o.letter === selected) cls += " selected";
         }
         return `<button class="${cls}" data-letter="${o.letter}" ${selected ? "disabled" : ""}>
-          <span class="letter">${o.letter}</span><span>${escapeHtml(o.text)}</span>
+          <span class="letter">${o.letter}</span><span>${formatRichText(o.text)}</span>
         </button>`;
       }).join("");
       let correctionHtml = "";
@@ -2726,7 +2989,7 @@ async function renderMasterSession(examId, startIdx){
         <div class="progress-track"><div class="progress-fill" style="width:${(state.idx+1)/total*100}%"></div></div>
         <div class="question-card">
           <span class="qnum">${q.num}</span>
-          <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+          <div class="qtext"><p>${formatRichText(q.text)}</p></div>
           <div class="options">${optionsHtml}</div>
           ${correctionHtml}
         </div>
@@ -2776,7 +3039,7 @@ async function renderMasterSession(examId, startIdx){
 
         <div class="question-card">
           <span class="qnum">${q.num}</span>
-          <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+          <div class="qtext"><p>${formatRichText(q.text)}</p></div>
           <textarea id="masterAnswer" rows="6" placeholder="${escapeHtml(t("bac2_placeholder"))}"
             style="width:100%; font-family:var(--font-body); font-size:14.5px; padding:14px; border-radius:var(--radius); border:1px solid var(--line); background:var(--paper); color:var(--ink); resize:vertical;">${escapeHtml(draft)}</textarea>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
@@ -2937,7 +3200,7 @@ async function renderBac3Session(examId, startIdx){
       let cls = "option";
       if (selected && o.letter === selected) cls += " selected";
       return `<button class="${cls}" data-letter="${o.letter}" ${selected ? "disabled" : ""}>
-        <span class="letter">${o.letter}</span><span>${escapeHtml(o.text)}</span>
+        <span class="letter">${o.letter}</span><span>${formatRichText(o.text)}</span>
       </button>`;
     }).join("");
     let correctionHtml = "";
@@ -2965,7 +3228,7 @@ async function renderBac3Session(examId, startIdx){
       <div class="progress-track"><div class="progress-fill" style="width:${(state.idx+1)/total*100}%"></div></div>
       <div class="question-card">
         <span class="qnum">${q.num}</span>
-        <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+        <div class="qtext"><p>${formatRichText(q.text)}</p></div>
         <div class="options">${optionsHtml}</div>
         ${correctionHtml}
       </div>
@@ -3143,7 +3406,7 @@ async function renderSession(examId, mode, startIdx){
       return `
       <button class="option ${cls}" data-letter="${o.letter}">
         <span class="letter">${o.letter}</span>
-        <span>${escapeHtml(o.text)}</span>
+        <span>${formatRichText(o.text)}</span>
       </button>`;
     }).join("");
 
@@ -3176,7 +3439,7 @@ async function renderSession(examId, mode, startIdx){
           <span class="qnum" style="margin-bottom:0;">${q.num} · ${currentLang === "ar" ? `${state.idx+1} من ${total}` : `Question ${state.idx+1} sur ${total}`}${hasCorrection ? ` · ${t("corrected_tag")}` : ""}</span>
           <button class="flag-btn ${state.flagged[state.idx] ? "on":""}" id="flagBtn" title="${t("flag_title")}">${state.flagged[state.idx] ? t("flag_marked") : t("flag_mark")}</button>
         </div>
-        <div class="qtext"><p>${escapeHtml(q.text)}</p></div>
+        <div class="qtext"><p>${formatRichText(q.text)}</p></div>
         <div class="options">${optionsHtml}</div>
         ${correctionHtml}
         <div class="kbd-hint">${t("kbd_hint")}</div>
