@@ -489,7 +489,9 @@ function renderMath(){
   }
 }
 
-/** Normalize Excel-ish math so KaTeX can render it. */
+/** Normalize Excel-ish math so KaTeX can render it.
+ *  Handles common Excel exports: u_n, e^{{-2}}, √, ∫, S_{2n}, (-1)^{n+1}
+ */
 function prepareMathText(raw){
   let s = String(raw == null ? "" : raw);
   if (!s) return s;
@@ -501,19 +503,22 @@ function prepareMathText(raw){
     return [...str].map(ch => map[ch] || ch).join("");
   }
 
-  // Normalize unicode minus in exponents
-  s = s.replace(/\u2212/g, "-");
+  s = s.replace(/\u2212/g, "-"); // unicode minus
 
-  // ∫ with unicode limits: ∫0¹ or ∫₀¹
+  // Collapse double braces from Excel: e^{{-2}} → e^{-2}, x^{{n+1}} → x^{n+1}
+  s = s.replace(/\^\{\{([^{}]+)\}\}/g, "^{$1}");
+  s = s.replace(/_\{\{([^{}]+)\}\}/g, "_{$1}");
+
+  // ∫ with unicode limits
   s = s.replace(/∫\s*([0-9₀₁₂₃₄₅₆₇₈₉]+)\s*([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, function(_, a, b){
-    const low = mapChars(a, Object.assign({}, subMap, {"0":"0","1":"1","2":"2","3":"3","4":"4","5":"5","6":"6","7":"7","8":"8","9":"9"}));
-    const high = mapChars(b, supMap);
-    return "\\int_{" + low + "}^{" + high + "}";
+    const low = mapChars(a, Object.assign({"0":"0","1":"1","2":"2","3":"3","4":"4","5":"5","6":"6","7":"7","8":"8","9":"9"}, subMap));
+    return "\\int_{" + low + "}^{" + mapChars(b, supMap) + "}";
   });
+
+  // symbols
   s = s.replace(/∫/g, "\\int");
   s = s.replace(/∑/g, "\\sum");
   s = s.replace(/∏/g, "\\prod");
-  s = s.replace(/√/g, "\\sqrt");
   s = s.replace(/∞/g, "\\infty");
   s = s.replace(/≤/g, "\\leq");
   s = s.replace(/≥/g, "\\geq");
@@ -521,6 +526,8 @@ function prepareMathText(raw){
   s = s.replace(/±/g, "\\pm");
   s = s.replace(/×/g, "\\times");
   s = s.replace(/·/g, "\\cdot");
+  s = s.replace(/≈/g, "\\approx");
+  s = s.replace(/→/g, "\\to");
   s = s.replace(/π/g, "\\pi");
   s = s.replace(/θ/g, "\\theta");
   s = s.replace(/α/g, "\\alpha");
@@ -532,7 +539,17 @@ function prepareMathText(raw){
   s = s.replace(/σ/g, "\\sigma");
   s = s.replace(/ω/g, "\\omega");
 
-  // I₀ → I_{0} ; x² → x^{2}
+  // √ — innermost parentheses first
+  for (let k = 0; k < 6; k++){
+    const next = s.replace(/√\s*\(([^()]*)\)/g, "\\sqrt{$1}");
+    if (next === s) break;
+    s = next;
+  }
+  s = s.replace(/√\s*\/\s*([A-Za-z0-9]+)/g, "\\sqrt{$1}");
+  s = s.replace(/√\s*([A-Za-z0-9]+)/g, "\\sqrt{$1}");
+  s = s.replace(/√/g, "\\sqrt");
+
+  // unicode sub/sup attached to letters
   s = s.replace(/([A-Za-z])([₀₁₂₃₄₅₆₇₈₉]+)/g, function(_, b, sub){
     return b + "_{" + mapChars(sub, subMap) + "}";
   });
@@ -540,18 +557,30 @@ function prepareMathText(raw){
     return b + "^{" + mapChars(sup, supMap) + "}";
   });
 
+  // Plain underscore subscripts from Excel: u_n, S_2n, I_0 → u_{n}, S_{2n}, I_{0}
+  // Avoid matching URLs or already braced
+  s = s.replace(/([A-Za-z])_(\{)/g, "$1_$2"); // already braced, leave
+  s = s.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, "$1_{$2}");
+
+  // Plain caret without braces: x^2 → x^{2} (single token)
+  s = s.replace(/([A-Za-z0-9])\^([A-Za-z0-9]+)/g, "$1^{$2}");
+
   // \int_0^1 → \int_{0}^{1}
   s = s.replace(/\\int_\{?([0-9]+)\}?\^\{?([0-9]+)\}?/g, "\\int_{$1}^{$2}");
   s = s.replace(/\\int_([0-9]+)\^([0-9]+)/g, "\\int_{$1}^{$2}");
 
   if (s.indexOf("$") >= 0 || s.indexOf("\\(") >= 0) return s;
 
-  // Collect spans to wrap (without nesting)
+  // Wrap math fragments in $...$
   const patterns = [
     /\\int(?:_\{[^}]+\})?(?:\^\{[^}]+\})?/g,
+    /\\sum(?:_\{[^}]+\})?(?:\^\{[^}]+\})?/g,
     /\\frac\{[^}]*\}\{[^}]*\}/g,
     /\\sqrt\{[^}]*\}/g,
+    /\\sqrt(?:\{[^}]*\})?/g,
+    /\\infty/g,
     /[A-Za-z0-9]*e\^\{[^}]+\}/g,
+    /\(-1\)\^\{[^}]+\}/g,
     /[A-Za-z][A-Za-z0-9]*\^\{[^}]+\}/g,
     /[A-Za-z][A-Za-z0-9]*_\{[^}]+\}/g
   ];
@@ -561,7 +590,7 @@ function prepareMathText(raw){
     let m;
     while ((m = re.exec(s)) !== null){
       ranges.push([m.index, m.index + m[0].length]);
-      if (m[0].length === 0) re.lastIndex++;
+      if (!m[0].length) re.lastIndex++;
     }
   });
   ranges.sort(function(a,b){ return a[0] - b[0] || b[1] - a[1]; });
