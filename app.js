@@ -580,6 +580,7 @@ function byIneditMatiere(concours, matiere){
 // Les questions et corrections sont chargées à la demande via /api, examen par examen,
 // pour qu'il soit impossible de récupérer toute la banque de QCM en un seul téléchargement.
 let EXAMS_DB = [];
+let EXAMS_META_LOADED = false;
 const UPLOADED_BY_ID = new Map(); // admin Excel uploads (full exams)
 const examQuestionsCache = new Map();
 const examCorrectionsCache = new Map();
@@ -588,6 +589,7 @@ async function loadExamsMeta(){
   const res = await fetch("/api/exams");
   if (!res.ok) throw new Error("exams meta fetch failed");
   EXAMS_DB = await res.json();
+  EXAMS_META_LOADED = true;
   await loadUploadedContent();
 }
 
@@ -625,6 +627,7 @@ async function loadCorrections(id){
 
 // ---------- Bac+2 (réponse libre) — données et stockage séparés du QCM ----------
 let BAC2_DB = [];
+let BAC2_META_LOADED = false;
 const bac2QuestionsCache = new Map();
 const bac2AnswersCache = new Map();
 
@@ -632,6 +635,7 @@ async function loadBac2Meta(){
   const res = await fetch("/api/bac2-exams");
   if (!res.ok) throw new Error("bac2 exams meta fetch failed");
   BAC2_DB = await res.json();
+  BAC2_META_LOADED = true;
   await loadUploadedContent();
 }
 async function loadBac2Questions(id){
@@ -672,6 +676,7 @@ function saveBac2Progress(examId, data){
 
 // ---------- Bac+3 (concours d'enseignement) — données et stockage séparés du reste ----------
 let BAC3_DB = [];
+let BAC3_META_LOADED = false;
 const bac3QuestionsCache = new Map();
 const bac3AnswersCache = new Map();
 
@@ -679,6 +684,7 @@ async function loadBac3Meta(){
   const res = await fetch("/api/bac3-exams");
   if (!res.ok) throw new Error("bac3 exams meta fetch failed");
   BAC3_DB = await res.json();
+  BAC3_META_LOADED = true;
   await loadUploadedContent();
 }
 async function loadBac3Questions(id){
@@ -726,6 +732,7 @@ function bac3ByFiliere(cycle, filiere){
 
 // ---------- Master (concours d'admission en Master) — données et stockage séparés ----------
 let MASTER_DB = [];
+let MASTER_META_LOADED = false;
 const masterQuestionsCache = new Map();
 const masterAnswersCache = new Map();
 
@@ -733,6 +740,7 @@ async function loadMasterMeta(){
   const res = await fetch("/api/master-exams");
   if (!res.ok) throw new Error("master exams meta fetch failed");
   MASTER_DB = await res.json();
+  MASTER_META_LOADED = true;
   await loadUploadedContent();
 }
 async function loadMasterQuestions(id){
@@ -1348,6 +1356,7 @@ function parseExcelSheetRows(rows, niveau, defaults, forceMode){
   const headers = rows[0].map(String);
   const iConc = pickCol(headers, ["concours", "exam", "examen"]);
   const iMat = pickCol(headers, ["matiere", "matière", "subject", "filiere", "filière"]);
+  const iCycle = pickCol(headers, ["cycle", "niveau cycle", "primaire", "secondaire"]);
   const iAnn = pickCol(headers, ["annee", "année", "year", "session"]);
   const iNum = pickCol(headers, ["question number", "num", "n", "numero", "numéro", "#"]);
   const iQ = pickCol(headers, ["question", "enonce", "énoncé", "texte", "text"]);
@@ -1367,10 +1376,17 @@ function parseExcelSheetRows(rows, niveau, defaults, forceMode){
     const qtext = cell(row, iQ);
     if (!qtext) continue;
     const concours = cell(row, iConc) || defaults.concours || "Import";
-    const matiere = cell(row, iMat) || defaults.matiere || (niveau === "bac3" ? "Épreuve" : "Général");
+    const matiere = cell(row, iMat) || defaults.matiere || (niveau === "bac3" ? (defaults.concours || "Épreuve") : "Général");
+    let cycle = cell(row, iCycle) || defaults.cycle || "";
+    if (niveau === "bac3"){
+      const c = cycle.toLowerCase();
+      if (c.includes("prim")) cycle = "Primaire";
+      else if (c.includes("sec")) cycle = "Secondaire";
+      else cycle = cycle || "Secondaire";
+    }
     const annee = cell(row, iAnn) || defaults.annee || new Date().getFullYear().toString();
-    const key = concours + "||" + matiere + "||" + annee;
-    if (!groups.has(key)) groups.set(key, { concours, matiere, annee, questions: [] });
+    const key = concours + "||" + matiere + "||" + annee + "||" + cycle;
+    if (!groups.has(key)) groups.set(key, { concours, matiere, annee, cycle, questions: [] });
 
     const optA = cell(row, iA), optB = cell(row, iB), optC = cell(row, iC), optD = cell(row, iD);
     const hasOpts = !!(optA || optB || optC || optD);
@@ -1410,10 +1426,15 @@ function parseExcelSheetRows(rows, niveau, defaults, forceMode){
     const id = makeUploadId(niveau, g.concours, g.matiere, g.annee);
     const nCorrected = g.questions.filter(q => q.correct || q.answer).length;
     const type = g.questions.some(q => q.options && q.options.length) ? "qcm" : "libre";
-    exams.push({
+    const exam = {
       id, niveau, concours: g.concours, matiere: g.matiere, annee: g.annee,
       n: g.questions.length, nCorrected, n_corrected: nCorrected, type, source: "upload", questions: g.questions
-    });
+    };
+    if (niveau === "bac3"){
+      exam.cycle = g.cycle || "Secondaire";
+      exam.filiere = g.matiere || g.concours || "Import";
+    }
+    exams.push(exam);
   }
   return exams;
 }
@@ -1502,7 +1523,12 @@ async function loadUploadedContent(){
       const n = row.niveau;
       if (byNiv[n]) byNiv[n].push(row);
     });
-    Object.keys(byNiv).forEach(n => mergeUploadedIntoDb(n, byNiv[n]));
+    // Only merge into a niveau after its static JSON catalog has been loaded.
+    // Otherwise uploads alone fill BAC3_DB/etc. and the app skips the API load.
+    if (EXAMS_META_LOADED) mergeUploadedIntoDb("bac", byNiv.bac);
+    if (BAC2_META_LOADED) mergeUploadedIntoDb("bac2", byNiv.bac2);
+    if (BAC3_META_LOADED) mergeUploadedIntoDb("bac3", byNiv.bac3);
+    if (MASTER_META_LOADED) mergeUploadedIntoDb("master", byNiv.master);
   }catch(e){
     console.warn("loadUploadedContent", e);
   }
@@ -1512,21 +1538,30 @@ async function saveExamsToSupabase(exams, niveau){
   if (!sbClient || !currentUser || !isAdmin()) throw new Error("admin");
   // sort_order must fit Postgres integer (max ~2e9). Use compact ranks.
   const baseOrder = Math.floor(Date.now() / 1000) % 1000000000; // seconds, clipped
-  const rows = exams.map((e, i) => ({
-    id: e.id,
-    niveau,
-    concours: e.concours,
-    matiere: e.matiere,
-    annee: e.annee,
-    n: e.n,
-    n_corrected: e.nCorrected || 0,
-    type: e.type || "qcm",
-    source: "upload",
-    questions: e.questions,
-    sort_order: baseOrder + i,
-    created_by: currentUser.id,
-    updated_at: new Date().toISOString()
-  }));
+  const rows = exams.map((e, i) => {
+    const row = {
+      id: e.id,
+      niveau,
+      concours: e.concours,
+      matiere: e.matiere,
+      annee: e.annee,
+      n: e.n,
+      n_corrected: e.nCorrected || 0,
+      type: e.type || "qcm",
+      source: "upload",
+      questions: e.questions,
+      sort_order: baseOrder + i,
+      created_by: currentUser.id,
+      updated_at: new Date().toISOString()
+    };
+    // Bac+3 catalog is keyed by cycle + filière (not plain concours)
+    if (niveau === "bac3"){
+      row.cycle = e.cycle || "Secondaire";
+      row.filiere = e.filiere || e.matiere || e.concours || "Import";
+      row.matiere = row.filiere;
+    }
+    return row;
+  });
   const { error } = await sbClient.from("content_exams").upsert(rows, { onConflict: "id" });
   if (error) throw error;
   mergeUploadedIntoDb(niveau, rows.map(r => ({ ...r, nCorrected: r.n_corrected })));
@@ -1706,16 +1741,23 @@ async function renderAdmin(){
           <div class="admin-fields-row">
             <div>
               <label class="auth-label">${t("admin_concours")}</label>
-              <input id="adminConcours" class="search-input auth-input" type="text" placeholder="ENSA" style="width:100%">
+              <input id="adminConcours" class="search-input auth-input" type="text" placeholder="ENSA / Informatique" style="width:100%">
             </div>
             <div>
               <label class="auth-label">${t("admin_matiere")}</label>
-              <input id="adminMatiere" class="search-input auth-input" type="text" placeholder="Chimie" style="width:100%">
+              <input id="adminMatiere" class="search-input auth-input" type="text" placeholder="Chimie / filière" style="width:100%">
             </div>
             <div>
               <label class="auth-label">${t("admin_annee")}</label>
               <input id="adminAnnee" class="search-input auth-input" type="text" placeholder="2024" style="width:100%">
             </div>
+          </div>
+          <div id="adminCycleWrap" hidden>
+            <label class="auth-label">Cycle (Bac+3)</label>
+            <select id="adminCycle" class="search-input auth-input">
+              <option value="Secondaire">Secondaire</option>
+              <option value="Primaire">Primaire</option>
+            </select>
           </div>
 
           <label class="auth-label">${t("admin_file")}</label>
@@ -1755,6 +1797,13 @@ async function renderAdmin(){
         </div>
       </div>
     </div>`;
+
+  const nivSel = document.getElementById("adminNiveau");
+  const cycleWrap = document.getElementById("adminCycleWrap");
+  const syncCycle = () => {
+    if (cycleWrap) cycleWrap.hidden = nivSel.value !== "bac3";
+  };
+  if (nivSel){ nivSel.addEventListener("change", syncCycle); syncCycle(); }
 
   // Segment QCM / libre
   const forceInput = document.getElementById("adminForceMode");
@@ -1805,10 +1854,12 @@ async function renderAdmin(){
   });
 
   function getDefaults(){
+    const cycleEl = document.getElementById("adminCycle");
     return {
       concours: document.getElementById("adminConcours").value.trim(),
       matiere: document.getElementById("adminMatiere").value.trim(),
-      annee: document.getElementById("adminAnnee").value.trim()
+      annee: document.getElementById("adminAnnee").value.trim(),
+      cycle: cycleEl ? cycleEl.value : ""
     };
   }
   function getParseOpts(){
@@ -2084,14 +2135,14 @@ function concoursPickerBodyHtml(){
       ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/concours">${t("see_all")} (${list.length})</a></div>` : ""}`;
   }
   if (homeLevel === "bac2"){
-    if (!BAC2_DB.length) return skeletonRows(2);
+    if (!BAC2_META_LOADED) return skeletonRows(2);
     const list = bac2ConcoursOrder();
     const sample = list.slice(0, 5).map(bac2ConcoursCardHtml).join("");
     return `<div class="grid">${sample}</div>
       ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/bac2">${t("see_all")} (${list.length})</a></div>` : ""}`;
   }
   if (homeLevel === "bac3"){
-    if (!BAC3_DB.length) return skeletonRows(2);
+    if (!BAC3_META_LOADED) return skeletonRows(2);
     const cycles = ["Primaire", "Secondaire"];
     const cards = cycles.map(cy => {
       const n = BAC3_DB.filter(e => e.cycle === cy).reduce((s,e)=>s+e.n,0);
@@ -2107,7 +2158,7 @@ function concoursPickerBodyHtml(){
     return `<div class="grid">${cards}</div>`;
   }
   // master
-  if (!MASTER_DB.length) return skeletonRows(2);
+  if (!MASTER_META_LOADED) return skeletonRows(2);
   const list = masterConcoursOrder();
   const sample = list.slice(0, 5).map(masterConcoursCardHtml).join("");
   return `<div class="grid">${sample}</div>
@@ -2154,9 +2205,9 @@ function moveLevelPill(animate = true){
 }
 
 async function loadLevelDataIfNeeded(level){
-  if (level === "bac2" && !BAC2_DB.length){ try{ await loadBac2Meta(); }catch(e){} }
-  if (level === "bac3" && !BAC3_DB.length){ try{ await loadBac3Meta(); }catch(e){} }
-  if (level === "master" && !MASTER_DB.length){ try{ await loadMasterMeta(); }catch(e){} }
+  if (level === "bac2" && !BAC2_META_LOADED){ try{ await loadBac2Meta(); }catch(e){} }
+  if (level === "bac3" && !BAC3_META_LOADED){ try{ await loadBac3Meta(); }catch(e){} }
+  if (level === "master" && !MASTER_META_LOADED){ try{ await loadMasterMeta(); }catch(e){} }
 }
 function wireConcoursPicker(){
   const track = document.getElementById("levelTabs");
@@ -2175,7 +2226,7 @@ function wireConcoursPicker(){
       moveLevelPill(true);
       const body = document.getElementById("concoursPickerBody");
       if (!body) return;
-      const needsLoad = (homeLevel === "bac2" && !BAC2_DB.length) || (homeLevel === "bac3" && !BAC3_DB.length) || (homeLevel === "master" && !MASTER_DB.length);
+      const needsLoad = (homeLevel === "bac2" && !BAC2_META_LOADED) || (homeLevel === "bac3" && !BAC3_META_LOADED) || (homeLevel === "master" && !MASTER_META_LOADED);
       if (needsLoad){
         body.innerHTML = skeletonRows(2);
         await loadLevelDataIfNeeded(homeLevel);
@@ -2673,7 +2724,7 @@ function renderModePicker(examId){
 // ---------- Bac+2 section (réponse libre) — complètement séparée du parcours QCM ----------
 async function renderBac2Home(){
   setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("bac2_title")}`);
-  if (!BAC2_DB.length){
+  if (!BAC2_META_LOADED){
     app.innerHTML = skeletonRows(3);
     try{ await loadBac2Meta(); }
     catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), renderBac2Home); return; }
@@ -2691,7 +2742,7 @@ async function renderBac2Home(){
 }
 
 async function renderBac2Concours(concours){
-  if (!BAC2_DB.length){
+  if (!BAC2_META_LOADED){
     app.innerHTML = skeletonRows(3);
     try{ await loadBac2Meta(); }
     catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), () => renderBac2Concours(concours)); return; }
@@ -2720,7 +2771,7 @@ async function renderBac2Concours(concours){
 
 async function renderMasterHome(){
   setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("master_title")}`);
-  if (!MASTER_DB.length){
+  if (!MASTER_META_LOADED){
     app.innerHTML = skeletonRows(3);
     try{ await loadMasterMeta(); }
     catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), renderMasterHome); return; }
@@ -2738,7 +2789,7 @@ async function renderMasterHome(){
 }
 
 async function renderMasterConcours(concours){
-  if (!MASTER_DB.length){
+  if (!MASTER_META_LOADED){
     app.innerHTML = skeletonRows(3);
     try{ await loadMasterMeta(); }
     catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), () => renderMasterConcours(concours)); return; }
@@ -2766,7 +2817,7 @@ async function renderMasterConcours(concours){
 }
 
 async function renderBac2Session(examId, startIdx){
-  if (!BAC2_DB.length){
+  if (!BAC2_META_LOADED){
     try{ await loadBac2Meta(); }catch(e){ /* exam meta below will 404 gracefully */ }
   }
   const meta = BAC2_DB.find(e => e.id === examId);
@@ -2926,7 +2977,7 @@ async function renderBac2Session(examId, startIdx){
 
 // ---------- Master session (adapté de Bac+2 : QCM ou réponse libre selon exam.type) ----------
 async function renderMasterSession(examId, startIdx){
-  if (!MASTER_DB.length){
+  if (!MASTER_META_LOADED){
     try{ await loadMasterMeta(); }catch(e){ /* exam meta below will 404 gracefully */ }
   }
   const meta = MASTER_DB.find(e => e.id === examId);
@@ -3086,7 +3137,7 @@ async function renderMasterSession(examId, startIdx){
 
 // ---------- Bac+3 (concours d'enseignement) — Primaire/Secondaire, puis filière ----------
 async function ensureBac3Loaded(retryFn){
-  if (BAC3_DB.length) return true;
+  if (BAC3_META_LOADED) return true;
   app.innerHTML = skeletonRows(2);
   try{ await loadBac3Meta(); return true; }
   catch(e){ app.innerHTML = retryBlock(t("err_load_exams"), retryFn); return false; }
@@ -3172,7 +3223,7 @@ async function renderBac3Filiere(cycleSlug, filiere){
 }
 
 async function renderBac3Session(examId, startIdx){
-  if (!BAC3_DB.length){
+  if (!BAC3_META_LOADED){
     try{ await loadBac3Meta(); }catch(e){ /* meta below will 404 gracefully */ }
   }
   const meta = BAC3_DB.find(e => e.id === examId);
