@@ -630,7 +630,8 @@ const CONCOURS_DESC = {
   "UM6SS":"Université Mohammed VI des Sciences et de la Santé — Mathématiques, Physique, Biologie",
   "ENSCK":"École Nationale Supérieure de Chimie de Kénitra — Chimie, Physique, Mathématiques",
   "ENAM":"École Nationale d'Agriculture de Meknès — Biologie, Physique, Mathématiques",
-  "ENA":"Écoles Nationales d'Architecture — Culture générale, Logique spatiale, Dessin technique"
+  "ENA":"Écoles Nationales d'Architecture — Culture générale, Logique spatiale, Dessin technique",
+  "Police Nationale":"Concours de la Police Nationale — Culture générale, droit, actualité"
 };
 
 // Descriptions pour les concours qui n'existent QUE côté Bac+2 (les autres — IAV, ISPITS,
@@ -685,6 +686,25 @@ function masterConcoursOrder(){
 function masterByConcours(concours){ return MASTER_DB.filter(e => e.concours === concours); }
 
 
+/** Ordered concours for Bac list: known order first, then any uploaded/extra names */
+function concoursOrder(){
+  const seen = new Set();
+  const out = [];
+  CONCOURS_ORDER.forEach(c => {
+    if (EXAMS_DB.some(e => e.concours === c && e.source !== "suprepa")){
+      out.push(c);
+      seen.add(c);
+    }
+  });
+  // Uploads / new concours not in the static list (e.g. Police Nationale)
+  EXAMS_DB.forEach(e => {
+    if (e.source === "suprepa") return;
+    if (!e.concours || seen.has(e.concours)) return;
+    out.push(e.concours);
+    seen.add(e.concours);
+  });
+  return out;
+}
 function byConcours(concours){
   return EXAMS_DB.filter(e => e.concours === concours && e.source !== "suprepa");
 }
@@ -696,7 +716,7 @@ function matieresOf(concours){
   return set.sort();
 }
 function examById(id){
-  return EXAMS_DB.find(e => e.id === id);
+  return EXAMS_DB.find(e => e.id === id) || UPLOADED_BY_ID.get(id) || null;
 }
 
 // ---------- "Questions inédites" (Original Suprepa) ----------
@@ -1980,7 +2000,11 @@ async function renderAdmin(){
     if (!file) throw new Error(currentLang === "ar" ? "اختر ملفاً" : "Choisis un fichier");
     await ensureXlsx();
     const buf = await file.arrayBuffer();
-    return XLSX.read(buf, { type: "array" });
+    const name = (file.name || "").toLowerCase();
+    // CSV sans BOM est lu en codepage système → arabe cassé. Forcer UTF-8 (65001).
+    const opts = { type: "array" };
+    if (name.endsWith(".csv") || name.endsWith(".txt")) opts.codepage = 65001;
+    return XLSX.read(buf, opts);
   }
 
   fileInput.addEventListener("change", async () => {
@@ -2280,7 +2304,7 @@ function masterConcoursCardHtml(c){
 }
 function concoursPickerBodyHtml(){
   if (homeLevel === "bac"){
-    const list = CONCOURS_ORDER.filter(c => byConcours(c).length);
+    const list = concoursOrder();
     const sample = list.slice(0, 5).map(concoursCardHtml).join("");
     return `<div class="grid">${sample}</div>
       ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/concours">${t("see_all")} (${list.length})</a></div>` : ""}`;
@@ -2682,7 +2706,7 @@ function renderMistakes(){
 
 function renderAllConcours(){
   setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("section_choose_concours")}`);
-  const list = CONCOURS_ORDER.filter(c => byConcours(c).length);
+  const list = concoursOrder();
   const cards = list.map(concoursCardHtml).join("");
   app.innerHTML = `
     <a class="backlink" href="#/">${backArrow()} ${t("nav_home")}</a>
