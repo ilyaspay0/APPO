@@ -721,12 +721,33 @@ const UPLOADED_BY_ID = new Map(); // admin Excel uploads (full exams)
 const examQuestionsCache = new Map();
 const examCorrectionsCache = new Map();
 
+async function fetchWithTimeout(url, ms){
+  ms = ms || 20000;
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), ms) : null;
+  try{
+    const res = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
+    return res;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function fetchMetaJson(staticUrl, apiUrl){
+  // Static file on CDN = no serverless cold start (fast path)
+  try{
+    const res = await fetchWithTimeout(staticUrl, 12000);
+    if (res && res.ok) return await res.json();
+  }catch(e){ /* fall through */ }
+  const res = await fetchWithTimeout(apiUrl, 25000);
+  if (!res.ok) throw new Error("meta fetch failed: " + apiUrl);
+  return await res.json();
+}
+
 async function loadExamsMeta(){
-  const res = await fetch("/api/exams");
-  if (!res.ok) throw new Error("exams meta fetch failed");
-  EXAMS_DB = await res.json();
+  EXAMS_DB = await fetchMetaJson("/data/exams-meta.json", "/api/exams");
   EXAMS_META_LOADED = true;
-  await loadUploadedContent();
+  loadUploadedContent().catch(() => {});
 }
 
 async function loadExamQuestions(id){
@@ -768,11 +789,9 @@ const bac2QuestionsCache = new Map();
 const bac2AnswersCache = new Map();
 
 async function loadBac2Meta(){
-  const res = await fetch("/api/bac2-exams");
-  if (!res.ok) throw new Error("bac2 exams meta fetch failed");
-  BAC2_DB = await res.json();
+  BAC2_DB = await fetchMetaJson("/data/bac2-meta.json", "/api/bac2-exams");
   BAC2_META_LOADED = true;
-  await loadUploadedContent();
+  loadUploadedContent().catch(() => {});
 }
 async function loadBac2Questions(id){
   if (bac2QuestionsCache.has(id)) return bac2QuestionsCache.get(id);
@@ -817,11 +836,9 @@ const bac3QuestionsCache = new Map();
 const bac3AnswersCache = new Map();
 
 async function loadBac3Meta(){
-  const res = await fetch("/api/bac3-exams");
-  if (!res.ok) throw new Error("bac3 exams meta fetch failed");
-  BAC3_DB = await res.json();
+  BAC3_DB = await fetchMetaJson("/data/bac3-meta.json", "/api/bac3-exams");
   BAC3_META_LOADED = true;
-  await loadUploadedContent();
+  loadUploadedContent().catch(() => {});
 }
 async function loadBac3Questions(id){
   if (bac3QuestionsCache.has(id)) return bac3QuestionsCache.get(id);
@@ -873,11 +890,9 @@ const masterQuestionsCache = new Map();
 const masterAnswersCache = new Map();
 
 async function loadMasterMeta(){
-  const res = await fetch("/api/master-exams");
-  if (!res.ok) throw new Error("master exams meta fetch failed");
-  MASTER_DB = await res.json();
+  MASTER_DB = await fetchMetaJson("/data/master-meta.json", "/api/master-exams");
   MASTER_META_LOADED = true;
-  await loadUploadedContent();
+  loadUploadedContent().catch(() => {});
 }
 async function loadMasterQuestions(id){
   if (masterQuestionsCache.has(id)) return masterQuestionsCache.get(id);
