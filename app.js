@@ -631,7 +631,9 @@ const CONCOURS_DESC = {
   "ENSCK":"École Nationale Supérieure de Chimie de Kénitra — Chimie, Physique, Mathématiques",
   "ENAM":"École Nationale d'Agriculture de Meknès — Biologie, Physique, Mathématiques",
   "ENA":"Écoles Nationales d'Architecture — Culture générale, Logique spatiale, Dessin technique",
-  "Police Nationale":"Concours de la Police Nationale — Culture générale, droit, actualité"
+  "Police Nationale":"Concours de la Police Nationale — Culture générale, droit, actualité",
+  "Gendarmerie Royale":"Gendarmerie Royale — Rédaction, culture générale",
+  "Gendarmerie Royale & ARM":"Gendarmerie Royale & Académie Royale Militaire — Rédaction, culture générale"
 };
 
 // Descriptions pour les concours qui n'existent QUE côté Bac+2 (les autres — IAV, ISPITS,
@@ -2229,6 +2231,13 @@ let sessionKeyHandler = null;
 function route(){
   if (examTimerHandle){ clearInterval(examTimerHandle); examTimerHandle = null; }
   if (sessionKeyHandler){ document.removeEventListener("keydown", sessionKeyHandler); sessionKeyHandler = null; }
+  // Avoid landing at the footer after refresh / route change
+  try{
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }catch(e){}
   const parts = parseHash();
   if (parts.length === 0) return renderHome();
   if (parts[0] === "admin") return renderAdmin();
