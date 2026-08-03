@@ -3374,6 +3374,44 @@ html[dir="rtl"] .auth-dropdown{
   padding: 8px 12px !important;
 }
 
+
+/* Admin list scroll */
+.admin-list-card #adminListBody,
+.admin-list-scroll{
+  max-height: min(62vh, 560px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  margin-top: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #8EB0D8 #E8F0FB;
+}
+.admin-list-scroll::-webkit-scrollbar,
+.admin-list-card #adminListBody::-webkit-scrollbar{
+  width: 8px;
+}
+.admin-list-scroll::-webkit-scrollbar-track,
+.admin-list-card #adminListBody::-webkit-scrollbar-track{
+  background: #E8F0FB;
+  border-radius: 8px;
+}
+.admin-list-scroll::-webkit-scrollbar-thumb,
+.admin-list-card #adminListBody::-webkit-scrollbar-thumb{
+  background: #8EB0D8;
+  border-radius: 8px;
+}
+.admin-list-scroll::-webkit-scrollbar-thumb:hover,
+.admin-list-card #adminListBody::-webkit-scrollbar-thumb:hover{
+  background: #1660D1;
+}
+/* KaTeX in options */
+.option .katex, .qtext .katex{
+  font-size: 1.05em;
+}
+.option{
+  overflow-x: auto;
+}
+
 </style>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 </head>

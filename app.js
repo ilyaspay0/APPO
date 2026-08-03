@@ -11,14 +11,28 @@ function escapeHtml(str){
 
 /** Escape HTML, then turn image URLs into <img> (http/https ending with image ext or any https URL marked) */
 function formatRichText(str){
-  let s = escapeHtml(str == null ? "" : String(str));
-  // Markdown-ish ![alt](url)
-  s = s.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi, (_, alt, url) =>
-    `<img class="q-img" src="${url}" alt="${alt || "figure"}" loading="lazy" />`);
-  // Bare image URLs
-  s = s.replace(/(https?:\/\/[^\s<]+\.(?:png|jpe?g|gif|webp|svg)(?:\?[^\s<]*)?)/gi, (url) =>
-    `<img class="q-img" src="${url}" alt="figure" loading="lazy" />`);
-  // Newlines
+  let prepared = prepareMathText(str == null ? "" : String(str));
+  const slots = [];
+  prepared = prepared.replace(/\$\$([\s\S]+?)\$\$/g, function(_, body){
+    slots.push({ d: true, m: body });
+    return "%%MATH" + (slots.length - 1) + "%%";
+  });
+  prepared = prepared.replace(/\$([^$]+?)\$/g, function(_, body){
+    slots.push({ d: false, m: body });
+    return "%%MATH" + (slots.length - 1) + "%%";
+  });
+  let s = escapeHtml(prepared);
+  s = s.replace(/%%MATH(\d+)%%/g, function(_, i){
+    const it = slots[Number(i)];
+    const body = escapeHtml(it.m);
+    return it.d ? ("$$" + body + "$$") : ("$" + body + "$");
+  });
+  s = s.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi, function(_, alt, url){
+    return '<img class="q-img" src="' + url + '" alt="' + (alt || "figure") + '" loading="lazy" />';
+  });
+  s = s.replace(/(https?:\/\/[^\s<]+\.(?:png|jpe?g|gif|webp|svg)(?:\?[^\s<]*)?)/gi, function(url){
+    return '<img class="q-img" src="' + url + '" alt="figure" loading="lazy" />';
+  });
   s = s.replace(/\n/g, "<br>");
   return s;
 }
@@ -462,16 +476,109 @@ function renderMath(){
   if (window.renderMathInElement){
     renderMathInElement(app, {
       delimiters: [
-        {left:"$$", right:"$$", display:true},
-        {left:"$", right:"$", display:false}
+        {left: "$$", right: "$$", display: true},
+        {left: "\\[", right: "\\]", display: true},
+        {left: "$", right: "$", display: false},
+        {left: "\\(", right: "\\)", display: false}
       ],
-      throwOnError:false
+      throwOnError: false,
+      strict: "ignore"
     });
   } else {
-    // KaTeX not yet loaded (defer script) — retry shortly
     setTimeout(renderMath, 150);
   }
 }
+
+/** Normalize Excel-ish math so KaTeX can render it. */
+function prepareMathText(raw){
+  let s = String(raw == null ? "" : raw);
+  if (!s) return s;
+
+  const supMap = {"⁰":"0","¹":"1","²":"2","³":"3","⁴":"4","⁵":"5","⁶":"6","⁷":"7","⁸":"8","⁹":"9","⁺":"+","⁻":"-","ⁿ":"n"};
+  const subMap = {"₀":"0","₁":"1","₂":"2","₃":"3","₄":"4","₅":"5","₆":"6","₇":"7","₈":"8","₉":"9"};
+
+  function mapChars(str, map){
+    return [...str].map(ch => map[ch] || ch).join("");
+  }
+
+  // Normalize unicode minus in exponents
+  s = s.replace(/\u2212/g, "-");
+
+  // ∫ with unicode limits: ∫0¹ or ∫₀¹
+  s = s.replace(/∫\s*([0-9₀₁₂₃₄₅₆₇₈₉]+)\s*([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, function(_, a, b){
+    const low = mapChars(a, Object.assign({}, subMap, {"0":"0","1":"1","2":"2","3":"3","4":"4","5":"5","6":"6","7":"7","8":"8","9":"9"}));
+    const high = mapChars(b, supMap);
+    return "\\int_{" + low + "}^{" + high + "}";
+  });
+  s = s.replace(/∫/g, "\\int");
+  s = s.replace(/∑/g, "\\sum");
+  s = s.replace(/∏/g, "\\prod");
+  s = s.replace(/√/g, "\\sqrt");
+  s = s.replace(/∞/g, "\\infty");
+  s = s.replace(/≤/g, "\\leq");
+  s = s.replace(/≥/g, "\\geq");
+  s = s.replace(/≠/g, "\\neq");
+  s = s.replace(/±/g, "\\pm");
+  s = s.replace(/×/g, "\\times");
+  s = s.replace(/·/g, "\\cdot");
+  s = s.replace(/π/g, "\\pi");
+  s = s.replace(/θ/g, "\\theta");
+  s = s.replace(/α/g, "\\alpha");
+  s = s.replace(/β/g, "\\beta");
+  s = s.replace(/γ/g, "\\gamma");
+  s = s.replace(/δ/g, "\\delta");
+  s = s.replace(/λ/g, "\\lambda");
+  s = s.replace(/μ/g, "\\mu");
+  s = s.replace(/σ/g, "\\sigma");
+  s = s.replace(/ω/g, "\\omega");
+
+  // I₀ → I_{0} ; x² → x^{2}
+  s = s.replace(/([A-Za-z])([₀₁₂₃₄₅₆₇₈₉]+)/g, function(_, b, sub){
+    return b + "_{" + mapChars(sub, subMap) + "}";
+  });
+  s = s.replace(/([A-Za-z0-9])([⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿ]+)/g, function(_, b, sup){
+    return b + "^{" + mapChars(sup, supMap) + "}";
+  });
+
+  // \int_0^1 → \int_{0}^{1}
+  s = s.replace(/\\int_\{?([0-9]+)\}?\^\{?([0-9]+)\}?/g, "\\int_{$1}^{$2}");
+  s = s.replace(/\\int_([0-9]+)\^([0-9]+)/g, "\\int_{$1}^{$2}");
+
+  if (s.indexOf("$") >= 0 || s.indexOf("\\(") >= 0) return s;
+
+  // Collect spans to wrap (without nesting)
+  const patterns = [
+    /\\int(?:_\{[^}]+\})?(?:\^\{[^}]+\})?/g,
+    /\\frac\{[^}]*\}\{[^}]*\}/g,
+    /\\sqrt\{[^}]*\}/g,
+    /[A-Za-z0-9]*e\^\{[^}]+\}/g,
+    /[A-Za-z][A-Za-z0-9]*\^\{[^}]+\}/g,
+    /[A-Za-z][A-Za-z0-9]*_\{[^}]+\}/g
+  ];
+  const ranges = [];
+  patterns.forEach(function(re){
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(s)) !== null){
+      ranges.push([m.index, m.index + m[0].length]);
+      if (m[0].length === 0) re.lastIndex++;
+    }
+  });
+  ranges.sort(function(a,b){ return a[0] - b[0] || b[1] - a[1]; });
+  const picked = [];
+  ranges.forEach(function(r){
+    if (picked.some(function(p){ return !(r[1] <= p[0] || r[0] >= p[1]); })) return;
+    picked.push(r);
+  });
+  picked.sort(function(a,b){ return b[0] - a[0]; });
+  picked.forEach(function(r){
+    const frag = s.slice(r[0], r[1]);
+    s = s.slice(0, r[0]) + "$" + frag + "$" + s.slice(r[1]);
+  });
+
+  return s;
+}
+
 
 function fmtTime(sec){
   sec = Math.max(0, Math.round(sec));
