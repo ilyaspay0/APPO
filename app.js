@@ -49,7 +49,10 @@ const prefersReducedMotion = () =>
 // rules (singular/dual/plural-3-10/plural-11+) — that's a known simplification, not a bug.
 const I18N = {
   fr: {
-    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", nav_level:"Niveau", nav_bac2:"Concours Bac+2", nav_bac3:"Concours d'enseignement", nav_master:"Concours Master", skip_to_content:"Aller au contenu",
+    nav_inedit:"Questions inédites", nav_progression:"Ma progression", nav_home:"Accueil", nav_level:"Niveau", nav_bac2:"Concours Bac+2", nav_licence:"Concours Licence", nav_bac3:"Concours d'enseignement", nav_master:"Concours Master", skip_to_content:"Aller au contenu",
+    level_bac:"Bac", level_bac2:"Bac+2", level_licence:"Licence", level_bac3:"Enseignement", level_master:"Master",
+    licence_title:"Concours Licence", licence_desc:"Concours d'accès aux licences pro et filières — regroupés par filière (Informatique, etc.).",
+    licence_empty:"Aucun concours Licence pour le moment. Importe-en depuis l'admin.",
     search_placeholder:"Chercher un concours, une matière…",
     theme_to_dark:"Passer en mode sombre", theme_to_light:"Passer en mode clair",
     lang_to_ar:"Passer l'interface en arabe", lang_to_fr:"Passer l'interface en français",
@@ -95,7 +98,6 @@ const I18N = {
     cover_status:"Statut", cover_ready:"Prêt",
     stat_questions:"Questions", stat_exams:"Examens", stat_concours:"Concours", stat_corrected:"Corrigées",
     section_choose_concours:"Choisis ton concours", section_resume:"Reprendre mes révisions", see_all:"Voir tout",
-    level_bac:"Bac", level_bac2:"Bac+2", level_bac3:"Bac+3", level_master:"Master",
     section_why:"Pourquoi Suprepa ?",
     feature_free_title:"100% gratuit", feature_free_desc:"Toute la banque de QCM est accessible librement, sans compte obligatoire et sans frais cachés.",
     feature_corrections_title:"Corrections détaillées", feature_corrections_desc:"Chaque question corrigée est accompagnée d'une explication claire : la bonne réponse, et pourquoi les autres sont fausses.",
@@ -192,7 +194,9 @@ const I18N = {
     cover_status:"الحالة", cover_ready:"جاهز",
     stat_questions:"الأسئلة", stat_exams:"الامتحانات", stat_concours:"المباريات", stat_corrected:"المصححة",
     section_choose_concours:"اختر مباراتك", section_resume:"استئناف مراجعتي", see_all:"عرض الكل",
-    level_bac:"البكالوريا", level_bac2:"Bac+2", level_bac3:"Bac+3", level_master:"ماستر",
+    level_bac:"البكالوريا", level_bac2:"Bac+2", level_licence:"إجازة", level_bac3:"تعليم", level_master:"ماستر",
+    licence_title:"مباريات الإجازة", licence_desc:"مباريات الولوج للإجازات المهنية والشعب الجامعية — مجمّعة حسب الشعبة.",
+    licence_empty:"لا توجد مباريات إجازة حالياً.",
     section_why:"لماذا Suprepa؟",
     feature_free_title:"مجاني 100%", feature_free_desc:"بنك الأسئلة بأكمله متاح مجانًا، بدون حساب إلزامي وبدون أي رسوم خفية.",
     feature_corrections_title:"تصحيحات مفصّلة", feature_corrections_desc:"كل سؤال مصحح مرفق بشرح واضح: الجواب الصحيح، وسبب خطأ الأجوبة الأخرى.",
@@ -718,7 +722,13 @@ function matieresOf(concours){
   return set.sort();
 }
 function examById(id){
-  return EXAMS_DB.find(e => e.id === id) || UPLOADED_BY_ID.get(id) || null;
+  return EXAMS_DB.find(e => e.id === id)
+    || BAC2_DB.find(e => e.id === id)
+    || BAC3_DB.find(e => e.id === id)
+    || MASTER_DB.find(e => e.id === id)
+    || LICENCE_DB.find(e => e.id === id)
+    || UPLOADED_BY_ID.get(id)
+    || null;
 }
 
 // ---------- "Questions inédites" (Original Suprepa) ----------
@@ -915,6 +925,64 @@ async function loadMasterMeta(){
   MASTER_DB = await fetchMetaJson("/data/master-meta.json", "/api/master-exams");
   MASTER_META_LOADED = true;
   loadUploadedContent().catch(() => {});
+}
+
+// ---------- Licence (concours licence pro / fac) — regroupé par filière ----------
+let LICENCE_DB = [];
+let LICENCE_META_LOADED = false;
+const licenceQuestionsCache = new Map();
+const licenceAnswersCache = new Map();
+
+async function loadLicenceMeta(){
+  // Pas de JSON statique obligatoire : les imports admin + éventuel fichier data/
+  try{
+    LICENCE_DB = await fetchMetaJson("/data/licence-meta.json", "/api/licence-exams");
+  }catch(e){
+    LICENCE_DB = [];
+  }
+  LICENCE_META_LOADED = true;
+  loadUploadedContent().catch(() => {});
+}
+async function loadLicenceQuestions(id){
+  if (licenceQuestionsCache.has(id)) return licenceQuestionsCache.get(id);
+  if (UPLOADED_BY_ID.has(id)){
+    const exam = UPLOADED_BY_ID.get(id);
+    const questions = (exam.questions || []).map(q => ({
+      num: q.num, text: q.text, options: q.options || [], hasCorrection: !!(q.correct)
+    }));
+    licenceQuestionsCache.set(id, questions);
+    return questions;
+  }
+  const res = await fetch("/api/licence-exam?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("licence exam fetch failed");
+  const data = await res.json();
+  licenceQuestionsCache.set(id, data.questions);
+  return data.questions;
+}
+async function loadLicenceCorrections(id){
+  if (licenceAnswersCache.has(id)) return licenceAnswersCache.get(id);
+  if (UPLOADED_BY_ID.has(id)){
+    const exam = UPLOADED_BY_ID.get(id);
+    const corrections = (exam.questions || []).map(q => ({ correct: q.correct || null, explanation: q.explanation || null }));
+    licenceAnswersCache.set(id, corrections);
+    return corrections;
+  }
+  const res = await fetch("/api/licence-correction?id=" + encodeURIComponent(id));
+  if (!res.ok) throw new Error("licence correction fetch failed");
+  const data = await res.json();
+  licenceAnswersCache.set(id, data.corrections);
+  return data.corrections;
+}
+function licenceFilieres(){
+  const seen = [];
+  LICENCE_DB.forEach(e => {
+    const f = e.filiere || e.matiere || "Autre";
+    if (!seen.includes(f)) seen.push(f);
+  });
+  return seen.sort();
+}
+function licenceByFiliere(filiere){
+  return LICENCE_DB.filter(e => (e.filiere || e.matiere || "Autre") === filiere);
 }
 async function loadMasterQuestions(id){
   if (masterQuestionsCache.has(id)) return masterQuestionsCache.get(id);
@@ -1537,8 +1605,10 @@ function parseExcelSheetRows(rows, niveau, defaults, forceMode){
   const iB = pickCol(headers, ["option b", "b", "choix b"]);
   const iC = pickCol(headers, ["option c", "c", "choix c"]);
   const iD = pickCol(headers, ["option d", "d", "choix d"]);
+  const iE = pickCol(headers, ["option e", "e", "choix e"]);
   const iCorr = pickCol(headers, ["correct answer", "correct", "reponse", "réponse", "answer", "bonne reponse"]);
   const iExpl = pickCol(headers, ["explanation", "explication", "corrige", "corrigé"]);
+  const iFil = pickCol(headers, ["filiere", "filière", "branch", "specialite", "spécialité"]);
 
   if (iQ < 0) throw new Error("Colonne « Question » introuvable");
 
@@ -1557,31 +1627,32 @@ function parseExcelSheetRows(rows, niveau, defaults, forceMode){
       else if (c.includes("sec")) cycle = "Secondaire";
       else cycle = cycle || "Secondaire";
     }
+    const filiere = cell(row, iFil) || defaults.filiere || (niveau === "licence" ? (defaults.matiere || "Informatique") : "");
     const annee = cell(row, iAnn) || defaults.annee || new Date().getFullYear().toString();
-    const key = concours + "||" + matiere + "||" + annee + "||" + cycle;
-    if (!groups.has(key)) groups.set(key, { concours, matiere, annee, cycle, questions: [] });
+    const key = concours + "||" + matiere + "||" + annee + "||" + cycle + "||" + filiere;
+    if (!groups.has(key)) groups.set(key, { concours, matiere, annee, cycle, filiere, questions: [] });
 
-    const optA = cell(row, iA), optB = cell(row, iB), optC = cell(row, iC), optD = cell(row, iD);
-    const hasOpts = !!(optA || optB || optC || optD);
+    const optA = cell(row, iA), optB = cell(row, iB), optC = cell(row, iC), optD = cell(row, iD), optE = cell(row, iE);
+    const hasOpts = !!(optA || optB || optC || optD || optE);
     const corrRaw = cell(row, iCorr);
     const expl = cell(row, iExpl) || null;
     const num = cell(row, iNum) || ("#" + (groups.get(key).questions.length + 1));
 
-    const preferLibre = forceMode === "libre" || (!forceMode && !hasOpts && niveau !== "bac");
+    const preferLibre = forceMode === "libre" || (!forceMode && !hasOpts && niveau !== "bac" && niveau !== "licence");
     if (!preferLibre){
       const options = [];
-      [["A", optA], ["B", optB], ["C", optC], ["D", optD]].forEach(([letter, text]) => {
+      [["A", optA], ["B", optB], ["C", optC], ["D", optD], ["E", optE]].forEach(([letter, text]) => {
         if (text) options.push({ letter, text });
       });
       if (options.length < 2){
         if (forceMode === "qcm") continue;
-        // fallback libre if incomplete options
         groups.get(key).questions.push({
           num: String(num), text: qtext, answer: corrRaw || expl || "", correct: null, explanation: expl
         });
         continue;
       }
-      let correct = (corrRaw || "").toUpperCase().replace(/[^A-D]/g, "").charAt(0) || null;
+      // Première lettre A–E (multi-réponses type "A,C" → on garde A pour l'instant)
+      let correct = (corrRaw || "").toUpperCase().replace(/[^A-E]/g, "").charAt(0) || null;
       if (correct && !options.some(o => o.letter === correct)) correct = null;
       groups.get(key).questions.push({
         num: String(num), text: qtext, options, correct, explanation: expl
@@ -1606,6 +1677,9 @@ function parseExcelSheetRows(rows, niveau, defaults, forceMode){
     if (niveau === "bac3"){
       exam.cycle = g.cycle || "Secondaire";
       exam.filiere = g.matiere || g.concours || "Import";
+    }
+    if (niveau === "licence"){
+      exam.filiere = g.filiere || defaults.filiere || "Informatique";
     }
     exams.push(exam);
   }
@@ -1680,6 +1754,10 @@ function mergeUploadedIntoDb(niveau, rows){
       BAC3_DB = BAC3_DB.filter(e => e.id !== meta.id).concat([meta]);
     } else if (niveau === "master"){
       MASTER_DB = MASTER_DB.filter(e => e.id !== meta.id).concat([meta]);
+    } else if (niveau === "licence"){
+      meta.filiere = row.filiere || row.matiere || "Informatique";
+      exam.filiere = meta.filiere;
+      LICENCE_DB = LICENCE_DB.filter(e => e.id !== meta.id).concat([meta]);
     }
   });
 }
@@ -1691,7 +1769,7 @@ async function loadUploadedContent(){
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    const byNiv = { bac: [], bac2: [], bac3: [], master: [] };
+    const byNiv = { bac: [], bac2: [], bac3: [], master: [], licence: [] };
     (data || []).forEach(row => {
       const n = row.niveau;
       if (byNiv[n]) byNiv[n].push(row);
@@ -1702,6 +1780,7 @@ async function loadUploadedContent(){
     if (BAC2_META_LOADED) mergeUploadedIntoDb("bac2", byNiv.bac2);
     if (BAC3_META_LOADED) mergeUploadedIntoDb("bac3", byNiv.bac3);
     if (MASTER_META_LOADED) mergeUploadedIntoDb("master", byNiv.master);
+    if (LICENCE_META_LOADED) mergeUploadedIntoDb("licence", byNiv.licence || []);
   }catch(e){
     console.warn("loadUploadedContent", e);
   }
@@ -1718,6 +1797,7 @@ async function saveExamsToSupabase(exams, niveau){
       concours: e.concours,
       matiere: e.matiere,
       annee: e.annee,
+      filiere: e.filiere || (niveau === "licence" ? (e.filiere || e.matiere || "Informatique") : null),
       n: e.n,
       n_corrected: e.nCorrected || 0,
       type: e.type || "qcm",
@@ -1907,9 +1987,14 @@ async function renderAdmin(){
           <select id="adminNiveau" class="search-input auth-input" required>
             <option value="bac">Bac / post-bac</option>
             <option value="bac2">Bac+2</option>
+            <option value="licence">Licence</option>
             <option value="bac3">Enseignement (Bac+3)</option>
             <option value="master">Master</option>
           </select>
+          <div id="adminFiliereWrap" hidden>
+            <label class="auth-label">${currentLang === "ar" ? "الشعبة (Licence)" : "Filière (Licence)"}</label>
+            <input id="adminFiliere" class="search-input auth-input" type="text" placeholder="Informatique / Économie…" style="width:100%">
+          </div>
 
           <div class="admin-fields-row">
             <div>
@@ -1973,8 +2058,10 @@ async function renderAdmin(){
 
   const nivSel = document.getElementById("adminNiveau");
   const cycleWrap = document.getElementById("adminCycleWrap");
+  const filiereWrap = document.getElementById("adminFiliereWrap");
   const syncCycle = () => {
     if (cycleWrap) cycleWrap.hidden = nivSel.value !== "bac3";
+    if (filiereWrap) filiereWrap.hidden = nivSel.value !== "licence";
   };
   if (nivSel){ nivSel.addEventListener("change", syncCycle); syncCycle(); }
 
@@ -2032,11 +2119,13 @@ async function renderAdmin(){
 
   function getDefaults(){
     const cycleEl = document.getElementById("adminCycle");
+    const filiereEl = document.getElementById("adminFiliere");
     return {
       concours: document.getElementById("adminConcours").value.trim(),
       matiere: document.getElementById("adminMatiere").value.trim(),
       annee: document.getElementById("adminAnnee").value.trim(),
-      cycle: cycleEl ? cycleEl.value : ""
+      cycle: cycleEl ? cycleEl.value : "",
+      filiere: filiereEl ? filiereEl.value.trim() : ""
     };
   }
   function getParseOpts(){
@@ -2261,6 +2350,10 @@ function route(){
   if (parts[0] === "bac3" && parts[1] === "exam" && parts.length === 4) return renderBac3Session(parts[2], parseInt(parts[3], 10));
   if (parts[0] === "bac3" && parts.length === 2) return renderBac3Cycle(parts[1]);
   if (parts[0] === "bac3" && parts.length === 3) return renderBac3Filiere(parts[1], parts[2]);
+  if (parts[0] === "licence" && parts.length === 1) return renderLicenceHome();
+  if (parts[0] === "licence" && parts.length === 2) return renderLicenceFiliere(parts[1]);
+  if (parts[0] === "licence" && parts[1] === "exam" && parts.length === 3) return renderSession(parts[2], "cours");
+  if (parts[0] === "licence" && parts[1] === "exam" && parts.length === 4) return renderSession(parts[2], "cours", parseInt(parts[3], 10));
   if (parts[0] === "master" && parts.length === 1) return renderMasterHome();
   if (parts[0] === "master" && parts[1] === "concours" && parts.length === 3) return renderMasterConcours(parts[2]);
   if (parts[0] === "master" && parts[1] === "exam" && parts.length === 3) return renderMasterSession(parts[2]);
@@ -2325,6 +2418,24 @@ function concoursPickerBodyHtml(){
     return `<div class="grid">${sample}</div>
       ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/bac2">${t("see_all")} (${list.length})</a></div>` : ""}`;
   }
+  if (homeLevel === "licence"){
+    if (!LICENCE_META_LOADED) return skeletonRows(2);
+    const list = licenceFilieres();
+    if (!list.length) return `<div class="empty">${t("licence_empty")}</div>`;
+    const cards = list.slice(0, 5).map(f => {
+      const exams = licenceByFiliere(f);
+      const q = exams.reduce((s,e)=>s+e.n,0);
+      return `
+        <a class="card concours-card" href="#/licence/${encodeURIComponent(f)}">
+          <span class="eyebrow">${t("level_licence")}</span>
+          <h3>${escapeHtml(f)}</h3>
+          <div class="meta">${nExamens(exams.length)}</div>
+          <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
+        </a>`;
+    }).join("");
+    return `<div class="grid">${cards}</div>
+      ${list.length > 5 ? `<div style="text-align:center; margin-top:20px;"><a class="btn" href="#/licence">${t("see_all")} (${list.length})</a></div>` : ""}`;
+  }
   if (homeLevel === "bac3"){
     if (!BAC3_META_LOADED) return skeletonRows(2);
     const cycles = ["Primaire", "Secondaire"];
@@ -2352,6 +2463,7 @@ function concoursPickerHtml(){
   const tabs = [
     ["bac", t("level_bac")],
     ["bac2", t("level_bac2")],
+    ["licence", t("level_licence")],
     ["bac3", t("level_bac3")],
     ["master", t("level_master")]
   ];
@@ -2392,6 +2504,7 @@ async function loadLevelDataIfNeeded(level){
   if (level === "bac2" && !BAC2_META_LOADED){ try{ await loadBac2Meta(); }catch(e){} }
   if (level === "bac3" && !BAC3_META_LOADED){ try{ await loadBac3Meta(); }catch(e){} }
   if (level === "master" && !MASTER_META_LOADED){ try{ await loadMasterMeta(); }catch(e){} }
+  if (level === "licence" && !LICENCE_META_LOADED){ try{ await loadLicenceMeta(); }catch(e){ LICENCE_META_LOADED = true; } }
 }
 function wireConcoursPicker(){
   const track = document.getElementById("levelTabs");
@@ -2410,7 +2523,7 @@ function wireConcoursPicker(){
       moveLevelPill(true);
       const body = document.getElementById("concoursPickerBody");
       if (!body) return;
-      const needsLoad = (homeLevel === "bac2" && !BAC2_META_LOADED) || (homeLevel === "bac3" && !BAC3_META_LOADED) || (homeLevel === "master" && !MASTER_META_LOADED);
+      const needsLoad = (homeLevel === "bac2" && !BAC2_META_LOADED) || (homeLevel === "bac3" && !BAC3_META_LOADED) || (homeLevel === "master" && !MASTER_META_LOADED) || (homeLevel === "licence" && !LICENCE_META_LOADED);
       if (needsLoad){
         body.innerHTML = skeletonRows(2);
         await loadLevelDataIfNeeded(homeLevel);
@@ -2721,6 +2834,69 @@ function renderAllConcours(){
     <a class="backlink" href="#/">${backArrow()} ${t("nav_home")}</a>
     <div class="section-head"><h2>${t("section_choose_concours")}</h2><span class="hint">${nExamens(list.length)}</span></div>
     <div class="grid">${cards}</div>
+  `;
+}
+
+function renderLicenceHome(){
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / ${t("level_licence")}`);
+  if (!LICENCE_META_LOADED){
+    app.innerHTML = skeletonRows(4);
+    loadLicenceMeta().then(() => renderLicenceHome()).catch(() => {
+      app.innerHTML = retryBlock(t("err_load_exams"), () => { LICENCE_META_LOADED = false; renderLicenceHome(); });
+    });
+    return;
+  }
+  const list = licenceFilieres();
+  if (!list.length){
+    app.innerHTML = `<a class="backlink" href="#/">${backArrow()} ${t("nav_home")}</a><div class="empty">${t("licence_empty")}</div>`;
+    return;
+  }
+  const cards = list.map(f => {
+    const exams = licenceByFiliere(f);
+    const q = exams.reduce((s,e)=>s+e.n,0);
+    return `
+      <a class="card concours-card" href="#/licence/${encodeURIComponent(f)}">
+        <span class="eyebrow">${t("level_licence")}</span>
+        <h3>${escapeHtml(f)}</h3>
+        <div class="meta">${nExamens(exams.length)}</div>
+        <div class="count">${q}<span style="font-size:13px;color:var(--ink-soft);font-weight:500;"> QCM</span></div>
+      </a>`;
+  }).join("");
+  app.innerHTML = `
+    <a class="backlink" href="#/">${backArrow()} ${t("nav_home")}</a>
+    <div class="section-head"><h2>${t("licence_title")}</h2><span class="hint">${list.length}</span></div>
+    <p class="hint" style="margin-bottom:16px;">${t("licence_desc")}</p>
+    <div class="grid">${cards}</div>
+  `;
+}
+
+function renderLicenceFiliere(filiere){
+  const f = decodeURIComponent(filiere);
+  setCrumbs(`<a href="#/">${t("nav_home")}</a> / <a href="#/licence">${t("level_licence")}</a> / ${escapeHtml(f)}`);
+  if (!LICENCE_META_LOADED){
+    app.innerHTML = skeletonRows(4);
+    loadLicenceMeta().then(() => renderLicenceFiliere(filiere)).catch(() => {
+      app.innerHTML = retryBlock(t("err_load_exams"), () => { LICENCE_META_LOADED = false; renderLicenceFiliere(filiere); });
+    });
+    return;
+  }
+  const exams = licenceByFiliere(f).slice().sort((a,b) => String(b.annee).localeCompare(String(a.annee)));
+  if (!exams.length){
+    app.innerHTML = `<a class="backlink" href="#/licence">${backArrow()} ${t("level_licence")}</a><div class="empty">${t("licence_empty")}</div>`;
+    return;
+  }
+  const rows = exams.map(e => `
+    <a class="exam-row" href="#/exam/${encodeURIComponent(e.id)}">
+      <div class="exam-row-main">
+        <strong>${escapeHtml(e.concours)}</strong>
+        <span>${escapeHtml(e.matiere)} · ${escapeHtml(formatAnnee(e.annee))}</span>
+      </div>
+      <div class="exam-row-meta">${e.n} Q · ${e.nCorrected || 0} ${t("corrected_tag")}</div>
+    </a>`).join("");
+  app.innerHTML = `
+    <a class="backlink" href="#/licence">${backArrow()} ${t("level_licence")}</a>
+    <div class="section-head"><h2>${escapeHtml(f)}</h2><span class="hint">${nExamens(exams.length)}</span></div>
+    <div class="exam-list">${rows}</div>
   `;
 }
 
