@@ -1669,11 +1669,12 @@ function parseExcelSheetRows(rows, niveau, defaults, forceMode){
   for (const g of groups.values()){
     if (!g.questions.length) continue;
     const id = makeUploadId(niveau, g.concours, g.matiere, g.annee);
+    const nQs = g.questions.length;
     const nCorrected = g.questions.filter(q => q.correct || q.answer).length;
     const type = g.questions.some(q => q.options && q.options.length) ? "qcm" : "libre";
     const exam = {
       id, niveau, concours: g.concours, matiere: g.matiere, annee: g.annee,
-      n: g.questions.length, nCorrected, n_corrected: nCorrected, type, source: "upload", questions: g.questions
+      n: nQs, nCorrected, n_corrected: nCorrected, type, source: "upload", questions: g.questions
     };
     if (niveau === "bac3"){
       exam.cycle = g.cycle || "Secondaire";
@@ -1945,24 +1946,63 @@ async function renderAdmin(){
     q: uploaded.reduce((s,u) => s + (u.n || 0), 0),
     bac: uploaded.filter(u => u.niveau === "bac").length,
     bac2: uploaded.filter(u => u.niveau === "bac2").length,
-    bac3: uploaded.filter(u => u.niveau === "bac3").length,
-    master: uploaded.filter(u => u.niveau === "master").length
+    licence: uploaded.filter(u => u.niveau === "licence").length,
+    master: uploaded.filter(u => u.niveau === "master").length,
+    bac3: uploaded.filter(u => u.niveau === "bac3").length
   };
+
+  // Comments + unique commenters (visitors who engaged)
+  let comments = [];
+  try{
+    if (sbClient){
+      const { data } = await sbClient.from("comments")
+        .select("id, exam_id, question_idx, user_id, display_name, body, parent_id, flagged_count, created_at")
+        .order("created_at", { ascending: false })
+        .limit(80);
+      comments = data || [];
+    }
+  }catch(e){}
+  const commenters = [...new Map(comments.map(c => [c.user_id, c.display_name || "—"])).entries()];
 
   const listHtml = uploaded.length ? uploaded.map(u => `
     <div class="admin-exam-card" draggable="true" data-id="${escapeHtml(u.id)}" data-niv="${escapeHtml(u.niveau)}">
       <button type="button" class="admin-drag-handle" title="Réordonner" aria-label="Réordonner">⋮⋮</button>
       <div class="admin-exam-main">
-        <span class="admin-pill">${escapeHtml(u.niveau)}</span>
+        <span class="admin-pill">${escapeHtml(u.niveau === "bac3" ? "enseignement" : u.niveau)}</span>
         ${u.type === "libre" ? `<span class="admin-pill admin-pill-soft">libre</span>` : `<span class="admin-pill admin-pill-soft">QCM</span>`}
         <div class="admin-exam-titles">
           <strong>${escapeHtml(u.concours)}</strong>
           <span>${escapeHtml(u.matiere)} · ${escapeHtml(formatAnnee(u.annee))}</span>
         </div>
       </div>
-      <div class="admin-exam-meta">${u.n} Q · ${(u.created_at||"").slice(0,10)}</div>
+      <div class="admin-exam-meta"><b>${u.n}</b> Q · ${(u.created_at||"").slice(0,10)}</div>
       <button type="button" class="btn" data-del-upload="${escapeHtml(u.id)}">${t("admin_delete")}</button>
     </div>`).join("") : `<div class="empty">${t("admin_empty_list")}</div>`;
+
+  const commentsHtml = comments.length ? comments.map(c => `
+    <div class="admin-comment-row" data-cid="${escapeHtml(c.id)}">
+      <div class="admin-comment-meta">
+        <span class="admin-pill admin-pill-soft">${escapeHtml((c.display_name || "—").slice(0, 24))}</span>
+        <span class="hint">${escapeHtml((c.created_at || "").slice(0, 16).replace("T", " "))}</span>
+        <a class="hint" href="#/exam/${encodeURIComponent(c.exam_id)}/cours/${c.question_idx}">${escapeHtml(c.exam_id)} · Q${c.question_idx + 1}</a>
+      </div>
+      <p class="admin-comment-body">${escapeHtml(c.body || "")}</p>
+      <div class="admin-comment-actions">
+        <button type="button" class="btn" data-admin-reply="${escapeHtml(c.id)}" data-exam="${escapeHtml(c.exam_id)}" data-qi="${c.question_idx}">Répondre</button>
+        <button type="button" class="btn" data-admin-del-comment="${escapeHtml(c.id)}" style="color:var(--red)">Supprimer</button>
+      </div>
+      <div class="admin-reply-box" id="replyBox-${escapeHtml(c.id)}" hidden>
+        <textarea class="search-input auth-input" rows="2" placeholder="Ta réponse…" style="width:100%;margin:8px 0"></textarea>
+        <button type="button" class="btn primary" data-admin-send-reply="${escapeHtml(c.id)}" data-exam="${escapeHtml(c.exam_id)}" data-qi="${c.question_idx}">Envoyer</button>
+      </div>
+    </div>`).join("") : `<div class="empty">${currentLang === "ar" ? "لا تعليقات بعد" : "Aucun commentaire pour le moment."}</div>`;
+
+  const usersHtml = commenters.length ? commenters.map(([uid, name]) => `
+    <div class="admin-user-row">
+      <span class="comment-avatar" style="width:28px;height:28px;font-size:11px">${escapeHtml((name || "?").slice(0,2).toUpperCase())}</span>
+      <strong>${escapeHtml(name || "—")}</strong>
+      <span class="hint" style="font-size:11px;word-break:break-all">${escapeHtml(String(uid).slice(0, 8))}…</span>
+    </div>`).join("") : `<div class="empty">${currentLang === "ar" ? "لا مستخدمين نشطين" : "Aucun commentateur encore."}</div>`;
 
   app.innerHTML = `
     <div class="admin-panel">
@@ -1976,8 +2016,17 @@ async function renderAdmin(){
           <div class="admin-stat"><b>${stats.q}</b><span>questions</span></div>
           <div class="admin-stat"><b>${stats.bac}</b><span>bac</span></div>
           <div class="admin-stat"><b>${stats.bac2}</b><span>bac+2</span></div>
+          <div class="admin-stat"><b>${stats.licence}</b><span>licence</span></div>
           <div class="admin-stat"><b>${stats.master}</b><span>master</span></div>
+          <div class="admin-stat"><b>${stats.bac3}</b><span>enseignement</span></div>
+          <div class="admin-stat"><b>${comments.length}</b><span>commentaires</span></div>
         </div>
+        <p class="hint" style="margin-top:12px">
+          Visiteurs (analytics) :
+          <a href="https://vercel.com/dashboard" target="_blank" rel="noopener">Vercel Analytics</a>
+          · Comptes Auth :
+          <a href="https://supabase.com/dashboard/project/pxlmtyhwqmbqenyytgos/auth/users" target="_blank" rel="noopener">Supabase Users</a>
+        </p>
       </div>
 
       <div class="admin-grid">
@@ -1995,8 +2044,8 @@ async function renderAdmin(){
             <option value="bac">Bac / post-bac</option>
             <option value="bac2">Bac+2</option>
             <option value="licence">Licence</option>
-            <option value="bac3">Enseignement (Bac+3)</option>
             <option value="master">Master</option>
+            <option value="bac3">Enseignement (concours d'emploi)</option>
           </select>
           <div id="adminFiliereWrap" hidden>
             <label class="auth-label">${currentLang === "ar" ? "الشعبة (Licence)" : "Filière (Licence)"}</label>
@@ -2050,15 +2099,31 @@ async function renderAdmin(){
         <div class="admin-card admin-list-card">
           <div class="admin-list-head">
             <h3>${t("admin_list")}</h3>
-            <select id="adminFilterNiv" class="search-input auth-input" style="max-width:140px">
-              <option value="">${currentLang === "ar" ? "الكل" : "Tous"}</option>
-              <option value="bac">bac</option>
-              <option value="bac2">bac2</option>
-              <option value="bac3">bac3</option>
-              <option value="master">master</option>
+            <select id="adminFilterNiv" class="search-input auth-input" style="max-width:180px">
+              <option value="">${currentLang === "ar" ? "الكل" : "Tous les niveaux"}</option>
+              <option value="bac">Bac</option>
+              <option value="bac2">Bac+2</option>
+              <option value="licence">Licence</option>
+              <option value="master">Master</option>
+              <option value="bac3">Enseignement</option>
             </select>
           </div>
-          <div id="adminListBody">${listHtml}</div>
+          <div id="adminListBody" class="admin-list-scroll">${listHtml}</div>
+        </div>
+      </div>
+
+      <div class="admin-grid" style="margin-top:20px">
+        <div class="admin-card">
+          <h3>${currentLang === "ar" ? "التعليقات" : "Commentaires récents"}</h3>
+          <p class="hint">${currentLang === "ar" ? "أجب مباشرة من هنا" : "Réponds aux questions des étudiants depuis ici."}</p>
+          <div class="admin-list-scroll" style="max-height:420px">${commentsHtml}</div>
+        </div>
+        <div class="admin-card">
+          <h3>${currentLang === "ar" ? "مستخدمون نشطون" : "Utilisateurs (commentateurs)"}</h3>
+          <p class="hint">${currentLang === "ar"
+            ? "الأسماء من التعليقات. قائمة كل الحسابات + الإيميل في لوحة Supabase Auth."
+            : "Noms issus des commentaires. Emails complets → Supabase Auth (lien ci-dessus)."}</p>
+          <div class="admin-list-scroll" style="max-height:320px">${usersHtml}</div>
         </div>
       </div>
     </div>`;
@@ -2192,6 +2257,39 @@ async function renderAdmin(){
       if (!confirm(t("admin_delete") + " ?")) return;
       try{
         await deleteUploadedExam(btn.dataset.delUpload);
+        renderAdmin();
+      }catch(e){ alert(e.message || t("admin_error")); }
+    });
+  });
+
+  // Admin: reply / delete comments
+  document.querySelectorAll("[data-admin-reply]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const box = document.getElementById("replyBox-" + btn.dataset.adminReply);
+      if (box) box.hidden = !box.hidden;
+    });
+  });
+  document.querySelectorAll("[data-admin-send-reply]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const box = document.getElementById("replyBox-" + btn.dataset.adminSendReply);
+      const ta = box && box.querySelector("textarea");
+      const text = (ta && ta.value || "").trim();
+      if (!text) return;
+      try{
+        await postComment(btn.dataset.exam, parseInt(btn.dataset.qi, 10), text, btn.dataset.adminSendReply);
+        renderAdmin();
+      }catch(e){ alert(e.message || t("admin_error")); }
+    });
+  });
+  document.querySelectorAll("[data-admin-del-comment]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Supprimer ce commentaire ?")) return;
+      try{
+        await deleteComment(btn.dataset.adminDelComment);
+        // Admin may delete any comment if RLS allows; otherwise only own
+        if (sbClient){
+          await sbClient.from("comments").delete().eq("id", btn.dataset.adminDelComment);
+        }
         renderAdmin();
       }catch(e){ alert(e.message || t("admin_error")); }
     });
@@ -2471,8 +2569,8 @@ function concoursPickerHtml(){
     ["bac", t("level_bac")],
     ["bac2", t("level_bac2")],
     ["licence", t("level_licence")],
-    ["bac3", t("level_bac3")],
-    ["master", t("level_master")]
+    ["master", t("level_master")],
+    ["bac3", t("level_bac3")]
   ];
   return `
     <div class="section-head" id="concours-grid">
