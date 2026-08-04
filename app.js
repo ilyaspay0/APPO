@@ -2991,17 +2991,22 @@ function renderLicenceFiliere(filiere){
     return;
   }
   const rows = exams.map(e => `
-    <a class="exam-row" href="#/exam/${encodeURIComponent(e.id)}">
-      <div class="exam-row-main">
-        <strong>${escapeHtml(e.concours)}</strong>
-        <span>${escapeHtml(e.matiere)} · ${escapeHtml(formatAnnee(e.annee))}</span>
+    <div class="exam-row">
+      <div class="left">
+        <span class="year">${escapeHtml(formatAnnee(e.annee))}</span>
+        <div>
+          <div style="font-weight:600;">${escapeHtml(e.concours)}</div>
+          <div class="n">${escapeHtml(e.matiere)} · ${e.n} Q · ${e.nCorrected || 0} ${t("corrected_tag")}</div>
+        </div>
       </div>
-      <div class="exam-row-meta">${e.n} Q · ${e.nCorrected || 0} ${t("corrected_tag")}</div>
-    </a>`).join("");
+      <div class="actions">
+        <a class="btn" href="#/exam/${encodeURIComponent(e.id)}">${t("btn_open")}</a>
+      </div>
+    </div>`).join("");
   app.innerHTML = `
     <a class="backlink" href="#/licence">${backArrow()} ${t("level_licence")}</a>
     <div class="section-head"><h2>${escapeHtml(f)}</h2><span class="hint">${nExamens(exams.length)}</span></div>
-    <div class="exam-list">${rows}</div>
+    ${rows}
   `;
 }
 

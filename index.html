@@ -514,6 +514,15 @@
     touch-action:pan-y;
   }
   .question-card .qnum{ font-family:var(--font-mono); font-size:12.5px; color:var(--gold-deep); font-weight:700; margin-bottom:10px; display:block;}
+  :root[data-theme="dark"] .question-card .qnum,
+  :root[data-theme="dark"] .session-head .sub,
+  :root[data-theme="dark"] .exam-row .n,
+  :root[data-theme="dark"] .hint{
+    color: #A8C4E8 !important;
+  }
+  :root[data-theme="dark"] .question-card .qtext{
+    color: var(--ink);
+  }
   .question-card .qtext{ font-size:16.5px; line-height:1.65; margin-bottom:22px;}
   .question-card .qtext p{margin:0 0 10px;}
 
