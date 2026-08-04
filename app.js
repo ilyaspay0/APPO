@@ -934,14 +934,15 @@ const licenceQuestionsCache = new Map();
 const licenceAnswersCache = new Map();
 
 async function loadLicenceMeta(){
-  // Pas de JSON statique obligatoire : les imports admin + éventuel fichier data/
+  // Pas de JSON statique obligatoire : les imports admin suffisent
   try{
     LICENCE_DB = await fetchMetaJson("/data/licence-meta.json", "/api/licence-exams");
   }catch(e){
-    LICENCE_DB = [];
+    LICENCE_DB = LICENCE_DB || [];
   }
   LICENCE_META_LOADED = true;
-  loadUploadedContent().catch(() => {});
+  // Toujours fusionner les uploads Supabase (source principale pour Licence)
+  try{ await loadUploadedContent(); }catch(e){}
 }
 async function loadLicenceQuestions(id){
   if (licenceQuestionsCache.has(id)) return licenceQuestionsCache.get(id);
@@ -1780,7 +1781,13 @@ async function loadUploadedContent(){
     if (BAC2_META_LOADED) mergeUploadedIntoDb("bac2", byNiv.bac2);
     if (BAC3_META_LOADED) mergeUploadedIntoDb("bac3", byNiv.bac3);
     if (MASTER_META_LOADED) mergeUploadedIntoDb("master", byNiv.master);
-    if (LICENCE_META_LOADED) mergeUploadedIntoDb("licence", byNiv.licence || []);
+    // Licence : toujours fusionner dès que les rows existent (pas de JSON statique requis)
+    if (byNiv.licence && byNiv.licence.length){
+      LICENCE_META_LOADED = true;
+      mergeUploadedIntoDb("licence", byNiv.licence);
+    } else if (LICENCE_META_LOADED){
+      mergeUploadedIntoDb("licence", byNiv.licence || []);
+    }
   }catch(e){
     console.warn("loadUploadedContent", e);
   }
