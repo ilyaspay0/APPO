@@ -148,22 +148,61 @@
   }
   :root[data-theme="dark"]{
     --p-ink-900:#E8EEF8;
-    --p-ink-500:#93A5C2;
+    --p-ink-500:#B4C4DC;
     --p-slate-50:#0B1420;
     --p-white:#131E2E;
-    --p-line-200:#243350;
-    --p-sky-500:#5B9EEA;
-    --p-sky-600:#7DB2F0;
-    --p-blue-600:#123464;
-    --p-blue-700:#0B2447;
+    --p-line-200:#2A3D5C;
+    --p-sky-500:#6BA8F0;
+    --p-sky-600:#8FBEF5;
+    --p-blue-600:#3D7AD6;
+    --p-blue-700:#5B94E8;
     --p-green-600:#4FBF8F;
     --p-red-600:#E08469;
     --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.3);
     --bg-selected: rgba(125,178,240,.14);
     --bg-correct: rgba(79,191,143,.14);
     --bg-incorrect: rgba(224,132,105,.14);
-    --bg-accent: rgba(91,158,234,.14);
+    --bg-accent: rgba(91,158,234,.16);
     --btn-primary-bg-hover:#1c2a42;
+  }
+  /* Dark: never navy-on-navy for labels / soft text */
+  :root[data-theme="dark"] .eyebrow,
+  :root[data-theme="dark"] .mode-card .eyebrow,
+  :root[data-theme="dark"] .qnum,
+  :root[data-theme="dark"] .question-card .qnum,
+  :root[data-theme="dark"] .session-head .sub,
+  :root[data-theme="dark"] .hint,
+  :root[data-theme="dark"] .exam-row .n,
+  :root[data-theme="dark"] .meta,
+  :root[data-theme="dark"] .card .meta,
+  :root[data-theme="dark"] .mode-card p,
+  :root[data-theme="dark"] .stat-cell span,
+  :root[data-theme="dark"] .summary-stat span,
+  :root[data-theme="dark"] .admin-exam-meta,
+  :root[data-theme="dark"] .admin-exam-titles span{
+    color: #A8C4E8 !important;
+  }
+  :root[data-theme="dark"] .mode-card h3,
+  :root[data-theme="dark"] .card h3,
+  :root[data-theme="dark"] .section-head h2{
+    color: var(--ink) !important;
+  }
+  :root[data-theme="dark"] .btn:not(.primary):not(.gold){
+    color: var(--ink);
+    border-color: #4A6A94;
+    background: rgba(255,255,255,.04);
+  }
+  :root[data-theme="dark"] .btn:not(.primary):not(.gold):hover{
+    border-color: #7DB2F0;
+    background: rgba(125,178,240,.12);
+  }
+  :root[data-theme="dark"] .btn.primary{
+    background: #2E6FD4;
+    border-color: #2E6FD4;
+    color: #fff;
+  }
+  :root[data-theme="dark"] .btn.primary:hover{
+    background: #3D7AD6;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
