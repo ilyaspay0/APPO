@@ -60,6 +60,16 @@ const I18N = {
     footer_nav_title:"Navigation", footer_choose_concours:"Choisir un concours", footer_faq:"Questions fréquentes",
     footer_contact_title:"Contact", footer_contact_text:"Une question, une suggestion, un problème sur un examen ? Écris-nous, on répond rapidement.",
     footer_copyright:"© 2026 Suprepa — banque de QCM d'entraînement pour les concours marocains",
+    donate_btn:"Soutenir Suprepa",
+    donate_title:"Soutenir Suprepa",
+    donate_sub:"Le site reste 100 % gratuit. Un virement volontaire aide à l'hébergement et à l'ajout de nouveaux concours.",
+    donate_bank:"Banque",
+    donate_holder:"Titulaire",
+    donate_rib:"RIB",
+    donate_iban:"IBAN (si disponible)",
+    donate_copy:"Copier le RIB",
+    donate_copied:"RIB copié ✓",
+    donate_note:"Libellé suggéré : Don Suprepa. Merci !",
     auth_sub:"Synchronise ta progression entre ton téléphone et ton ordinateur.", auth_google:"Continuer avec Google",
     auth_or:"ou", auth_email:"Email", auth_password:"Mot de passe", auth_username:"Nom d'utilisateur", auth_username_ph:"ex. sara_ensa", auth_login:"Se connecter", auth_signup:"Créer mon compte",
     auth_phone:"Téléphone", auth_phone_ph:"06 XX XX XX XX",
@@ -181,6 +191,16 @@ const I18N = {
     footer_nav_title:"التصفح", footer_choose_concours:"اختر مباراة", footer_faq:"الأسئلة الشائعة",
     footer_contact_title:"تواصل معنا", footer_contact_text:"سؤال، اقتراح، أو مشكلة في امتحان؟ اكتب لنا، نرد بسرعة.",
     footer_copyright:"© 2026 Suprepa — بنك أسئلة للتدرب على المباريات المغربية",
+    donate_btn:"ادعم Suprepa",
+    donate_title:"ادعم Suprepa",
+    donate_sub:"الموقع يبقى مجانيًا 100٪. تحويل اختياري يساعد على الاستضافة وإضافة مباريات جديدة.",
+    donate_bank:"البنك",
+    donate_holder:"صاحب الحساب",
+    donate_rib:"RIB",
+    donate_iban:"IBAN (إن وُجد)",
+    donate_copy:"نسخ RIB",
+    donate_copied:"تم نسخ RIB ✓",
+    donate_note:"المرجع المقترح: Don Suprepa. شكرًا!",
     auth_sub:"زامن تقدمك بين هاتفك وحاسوبك.", auth_google:"الاستمرار باستخدام Google",
     auth_or:"أو", auth_email:"البريد الإلكتروني", auth_password:"كلمة المرور", auth_username:"اسم المستخدم", auth_username_ph:"مثال sara_ensa", auth_login:"تسجيل الدخول", auth_signup:"إنشاء حسابي",
     auth_phone:"الهاتف", auth_phone_ph:"06 XX XX XX XX",
@@ -279,6 +299,57 @@ const I18N = {
     comments_error:"تعذر تحميل التعليقات.", comments_hidden_reported:"تعليق مخفي (تم الإبلاغ عنه عدة مرات).",
   }
 };
+
+// ---------- Don / soutien (virement BMCE) ----------
+// Remplace titulaire + RIB par tes vraies infos BMCE.
+const DONATE_CONFIG = {
+  bank: "BMCE Bank of Africa",
+  holder: "ILYAS TAMMOUCH",   // ← ton nom sur le compte
+  rib: "011 780 0000XXXXXXXXXX 00", // ← ton RIB complet (24 chiffres)
+  iban: "" // optionnel, laisse vide si tu n'en as pas
+};
+
+function openDonateModal(){
+  const overlay = document.getElementById("donateOverlay");
+  if (!overlay) return;
+  const holder = document.getElementById("donateHolder");
+  const rib = document.getElementById("donateRib");
+  const iban = document.getElementById("donateIban");
+  const ibanRow = document.getElementById("donateIbanRow");
+  if (holder) holder.textContent = DONATE_CONFIG.holder;
+  if (rib) rib.textContent = DONATE_CONFIG.rib;
+  if (DONATE_CONFIG.iban && iban && ibanRow){
+    iban.textContent = DONATE_CONFIG.iban;
+    ibanRow.hidden = false;
+  }
+  overlay.hidden = false;
+}
+function closeDonateModal(){
+  const overlay = document.getElementById("donateOverlay");
+  if (overlay) overlay.hidden = true;
+}
+function initDonateUI(){
+  document.getElementById("donateOpenBtn")?.addEventListener("click", openDonateModal);
+  document.getElementById("donateTopbarBtn")?.addEventListener("click", openDonateModal);
+  document.getElementById("donateCloseBtn")?.addEventListener("click", closeDonateModal);
+  document.getElementById("donateOverlay")?.addEventListener("click", (e) => {
+    if (e.target.id === "donateOverlay") closeDonateModal();
+  });
+  document.getElementById("donateCopyBtn")?.addEventListener("click", async () => {
+    const text = (DONATE_CONFIG.rib || "").replace(/\s/g, "");
+    try{
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById("donateCopyBtn");
+      if (btn){
+        const prev = btn.textContent;
+        btn.textContent = t("donate_copied");
+        setTimeout(() => { btn.textContent = t("donate_copy"); }, 1600);
+      }
+    }catch(e){
+      prompt(currentLang === "ar" ? "انسخ RIB:" : "Copie le RIB :", text);
+    }
+  });
+}
 
 const LANG_KEY = "suprepa-lang";
 let currentLang = "fr";
@@ -1285,6 +1356,7 @@ function renderAuthArea(){
             ? `<div class="auth-dropdown-email" style="border:0;margin:0;padding-top:0;opacity:.85">${escapeHtml(currentUser.user_metadata.prepare_label)}</div>`
             : ""}
           ${isAdmin() ? `<a class="auth-dropdown-item" href="#/admin">${t("admin_link")}</a>` : ""}
+          <button type="button" class="auth-dropdown-item" id="authDonateBtn">${t("donate_btn")}</button>
           <button type="button" class="auth-dropdown-item auth-dropdown-danger" id="authSignOutBtn">${t("auth_signout")}</button>
         </div>
       </div>`;
@@ -1307,6 +1379,10 @@ function renderAuthArea(){
         dd.hidden ? open() : close();
       });
     }
+    document.getElementById("authDonateBtn")?.addEventListener("click", () => {
+      close();
+      openDonateModal();
+    });
     document.getElementById("authSignOutBtn")?.addEventListener("click", () => {
       close();
       sbClient && sbClient.auth.signOut();
@@ -2539,6 +2615,7 @@ function boot(){
   applyStaticTranslations();
   renderAuthArea();
   initAuthModalEvents();
+  initDonateUI();
   initSupabase();
   app.innerHTML = skeletonHome();
   loadExamsMeta().then(() => { route(); lastRouteRank = routeRank(parseHash()); }).catch(() => {

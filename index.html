@@ -3162,6 +3162,62 @@ body{
 .admin-status.admin-ok{ background: #EAF6EF; color: #1B5E3B; }
 .admin-status.admin-error,
 .admin-error{ background: #FDECEC; color: #8B1E16; }
+/* Topbar donate: full label on desktop, heart icon only on narrow screens */
+.donate-topbar-btn{
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px !important;
+  border: 1.5px solid rgba(255,255,255,.45) !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.14) !important;
+  color: #fff !important;
+  font-size: 12.5px !important;
+  font-weight: 650 !important;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s ease, border-color .15s ease, transform .12s ease;
+}
+.donate-topbar-btn:hover{
+  background: rgba(255,255,255,.26) !important;
+  border-color: rgba(255,255,255,.7) !important;
+}
+.donate-topbar-btn svg{ flex-shrink: 0; }
+.donate-topbar-label{ white-space: nowrap; }
+@media (max-width: 900px){
+  .donate-topbar-btn{
+    width: 36px;
+    height: 36px;
+    padding: 0 !important;
+    border-radius: 50% !important;
+  }
+  .donate-topbar-label{ display: none !important; }
+}
+
+.donate-card{
+  background: var(--paper, #F3F7FC);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.donate-row{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13.5px;
+}
+.donate-row span{ color: var(--ink-soft); flex-shrink: 0; }
+.donate-row strong{ text-align: end; word-break: break-all; }
+.donate-mono{ font-family: var(--font-mono); font-size: 12.5px; letter-spacing: .02em; }
+:root[data-theme="dark"] .donate-card{ background: rgba(255,255,255,.04); }
+
 .auth-admin-link{
   font-size: 12px;
   font-weight: 700;
@@ -3510,6 +3566,10 @@ html[dir="rtl"] .auth-dropdown{
           <a href="#/bac3" data-i18n="nav_bac3">Concours d'enseignement</a>
         </div>
       </div>
+      <button type="button" class="donate-topbar-btn" id="donateTopbarBtn" data-i18n-title="donate_btn" title="Soutenir Suprepa" aria-label="Soutenir Suprepa">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <span class="donate-topbar-label" data-i18n="donate_btn">Soutenir</span>
+      </button>
       <div id="authArea"></div>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Changer de thème" title="Changer de thème"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <button class="lang-toggle" id="langToggle" type="button" aria-label="Passer l'interface en arabe" title="FR / AR">
@@ -3556,11 +3616,29 @@ html[dir="rtl"] .auth-dropdown{
           <span class="icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
           <a href="mailto:ilyaspay0@gmail.com">ilyaspay0@gmail.com</a>
         </div>
+        <button type="button" class="btn gold" id="donateOpenBtn" data-i18n="donate_btn" style="margin-top:14px;">Soutenir Suprepa</button>
       </div>
     </div>
     <div class="footer-bottom" data-i18n="footer_copyright">© 2026 Suprepa — banque de QCM d'entraînement pour les concours marocains</div>
   </div>
 </footer>
+
+<!-- ---------- Modal don BMCE ---------- -->
+<div id="donateOverlay" class="auth-overlay" hidden>
+  <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="donateTitle">
+    <button class="auth-close" id="donateCloseBtn" type="button" aria-label="Fermer">✕</button>
+    <h3 id="donateTitle" data-i18n="donate_title">Soutenir Suprepa</h3>
+    <p class="auth-sub" data-i18n="donate_sub">Le site reste 100 % gratuit. Un virement volontaire aide à l'hébergement et à l'ajout de nouveaux concours.</p>
+    <div class="donate-card">
+      <div class="donate-row"><span data-i18n="donate_bank">Banque</span><strong>BMCE Bank of Africa</strong></div>
+      <div class="donate-row"><span data-i18n="donate_holder">Titulaire</span><strong id="donateHolder">À COMPLÉTER</strong></div>
+      <div class="donate-row"><span data-i18n="donate_rib">RIB</span><strong id="donateRib" class="donate-mono">000 000 0000000000000000 00</strong></div>
+      <div class="donate-row" id="donateIbanRow" hidden><span data-i18n="donate_iban">IBAN</span><strong id="donateIban" class="donate-mono"></strong></div>
+    </div>
+    <button type="button" class="btn primary" id="donateCopyBtn" style="width:100%;justify-content:center;margin-top:14px;" data-i18n="donate_copy">Copier le RIB</button>
+    <p class="hint" style="margin-top:12px;text-align:center;" data-i18n="donate_note">Libellé suggéré : Don Suprepa. Merci !</p>
+  </div>
+</div>
 
 <!-- ---------- Modal de connexion / inscription ---------- -->
 <div id="authModalOverlay" class="auth-overlay" hidden>
