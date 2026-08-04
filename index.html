@@ -3585,6 +3585,20 @@ html[dir="rtl"] .auth-dropdown{
       <input class="search-input auth-input" id="authEmail" type="email" required autocomplete="email" style="width:100%;color:var(--ink);">
       <label class="auth-label" data-i18n="auth_password">Mot de passe</label>
       <input class="search-input auth-input" id="authPassword" type="password" required minlength="6" autocomplete="current-password" style="width:100%;color:var(--ink);">
+      <div id="authSignupExtra" hidden>
+        <label class="auth-label" data-i18n="auth_phone">Téléphone</label>
+        <input class="search-input auth-input" id="authPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="06 XX XX XX XX" data-i18n-placeholder="auth_phone_ph" style="width:100%;color:var(--ink);">
+        <label class="auth-label" data-i18n="auth_prepare">Je prépare</label>
+        <select class="search-input auth-input" id="authPrepare" style="width:100%;color:var(--ink);">
+          <option value="">— Choisir —</option>
+          <option value="bac">Concours post-bac (ENSA, Médecine, ENCG…)</option>
+          <option value="bac2">Concours Bac+2 (écoles d'ingénieurs…)</option>
+          <option value="licence">Licence professionnelle / universitaire</option>
+          <option value="master">Master / Bac+5</option>
+          <option value="enseignement">Concours d'enseignement</option>
+          <option value="autre">Autre / plusieurs</option>
+        </select>
+      </div>
       <div id="authError" class="auth-error" hidden></div>
       <button class="btn primary" id="authSubmitBtn" type="submit" style="width:100%; justify-content:center; margin-top:14px;" data-i18n="auth_login">Se connecter</button>
     </form>

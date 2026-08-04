@@ -62,6 +62,13 @@ const I18N = {
     footer_copyright:"© 2026 Suprepa — banque de QCM d'entraînement pour les concours marocains",
     auth_sub:"Synchronise ta progression entre ton téléphone et ton ordinateur.", auth_google:"Continuer avec Google",
     auth_or:"ou", auth_email:"Email", auth_password:"Mot de passe", auth_username:"Nom d'utilisateur", auth_username_ph:"ex. sara_ensa", auth_login:"Se connecter", auth_signup:"Créer mon compte",
+    auth_phone:"Téléphone", auth_phone_ph:"06 XX XX XX XX",
+    auth_prepare:"Je prépare",
+    auth_prepare_required:"Indique le niveau que tu prépares.",
+    auth_phone_required:"Indique un numéro de téléphone valide (8 chiffres min.).",
+    auth_profile_title:"Complète ton profil",
+    auth_profile_sub:"Une fois pour personnaliser Suprepa et te recontacter si besoin.",
+    auth_profile_save:"Enregistrer",
     auth_no_account:"Pas encore de compte ?", auth_have_account:"Déjà un compte ?",
     auth_create_account:"Créer un compte", auth_close:"Fermer", auth_signout:"Se déconnecter", auth_connected:"Connecté",
     auth_connect_title:"Facultatif — connecte-toi pour garder ta progression entre ton téléphone et ton ordinateur",
@@ -176,6 +183,13 @@ const I18N = {
     footer_copyright:"© 2026 Suprepa — بنك أسئلة للتدرب على المباريات المغربية",
     auth_sub:"زامن تقدمك بين هاتفك وحاسوبك.", auth_google:"الاستمرار باستخدام Google",
     auth_or:"أو", auth_email:"البريد الإلكتروني", auth_password:"كلمة المرور", auth_username:"اسم المستخدم", auth_username_ph:"مثال sara_ensa", auth_login:"تسجيل الدخول", auth_signup:"إنشاء حسابي",
+    auth_phone:"الهاتف", auth_phone_ph:"06 XX XX XX XX",
+    auth_prepare:"أحضّر لـ",
+    auth_prepare_required:"حدد المستوى الذي تحضّر له.",
+    auth_phone_required:"أدخل رقم هاتف صالح (8 أرقام على الأقل).",
+    auth_profile_title:"أكمل ملفك",
+    auth_profile_sub:"مرة واحدة لتخصيص Suprepa والتواصل عند الحاجة.",
+    auth_profile_save:"حفظ",
     auth_no_account:"ليس لديك حساب؟", auth_have_account:"لديك حساب؟",
     auth_create_account:"إنشاء حساب", auth_close:"إغلاق", auth_signout:"تسجيل الخروج", auth_connected:"متصل",
     auth_connect_title:"اختياري — سجّل الدخول للاحتفاظ بتقدمك بين هاتفك وحاسوبك",
@@ -1242,7 +1256,13 @@ function initSupabase(){
 async function onAuthChanged(user){
   currentUser = user;
   renderAuthArea();
-  if (user) await mergeCloudProgress(user.id);
+  if (user){
+    await mergeCloudProgress(user.id);
+    // Google (ou ancien compte) sans téléphone / objectif → compléter une fois
+    if (needsProfileCompletion(user)){
+      setTimeout(() => openProfileCompleteModal(), 400);
+    }
+  }
   const parts = parseHash();
   if (parts[0] === "admin") renderAdmin();
 }
@@ -1261,6 +1281,9 @@ function renderAuthArea(){
         </button>
         <div class="auth-dropdown" id="authDropdown" hidden>
           <div class="auth-dropdown-email">${escapeHtml(email)}</div>
+          ${currentUser.user_metadata && currentUser.user_metadata.prepare_label
+            ? `<div class="auth-dropdown-email" style="border:0;margin:0;padding-top:0;opacity:.85">${escapeHtml(currentUser.user_metadata.prepare_label)}</div>`
+            : ""}
           ${isAdmin() ? `<a class="auth-dropdown-item" href="#/admin">${t("admin_link")}</a>` : ""}
           <button type="button" class="auth-dropdown-item auth-dropdown-danger" id="authSignOutBtn">${t("auth_signout")}</button>
         </div>
@@ -1336,6 +1359,97 @@ function setAuthMode(mode){
     userInput.required = mode === "signup";
     if (mode !== "signup") userInput.value = "";
   }
+  const extra = document.getElementById("authSignupExtra");
+  if (extra) extra.hidden = mode !== "signup";
+  const phone = document.getElementById("authPhone");
+  const prep = document.getElementById("authPrepare");
+  if (phone){ phone.required = mode === "signup"; if (mode !== "signup") phone.value = ""; }
+  if (prep){ prep.required = mode === "signup"; if (mode !== "signup") prep.value = ""; }
+}
+
+function normalizePhone(raw){
+  return String(raw || "").replace(/[^\d+]/g, "").trim();
+}
+function isValidPhone(raw){
+  const digits = normalizePhone(raw).replace(/\D/g, "");
+  return digits.length >= 8 && digits.length <= 15;
+}
+const PREPARE_LABELS = {
+  bac: "Post-bac",
+  bac2: "Bac+2",
+  licence: "Licence",
+  master: "Master / Bac+5",
+  enseignement: "Enseignement",
+  autre: "Autre"
+};
+function needsProfileCompletion(user){
+  if (!user) return false;
+  const m = user.user_metadata || {};
+  return !m.phone || !m.prepare_level;
+}
+async function saveUserProfileMeta({ phone, prepare_level, username }){
+  if (!sbClient || !currentUser) return;
+  const data = {};
+  if (phone) data.phone = normalizePhone(phone);
+  if (prepare_level){
+    data.prepare_level = prepare_level;
+    data.prepare_label = PREPARE_LABELS[prepare_level] || prepare_level;
+  }
+  if (username) data.username = username;
+  const { error } = await sbClient.auth.updateUser({ data });
+  if (error) throw error;
+  // refresh local user
+  const { data: sess } = await sbClient.auth.getUser();
+  if (sess && sess.user) currentUser = sess.user;
+  renderAuthArea();
+}
+function openProfileCompleteModal(){
+  if (document.getElementById("profileCompleteOverlay")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "profileCompleteOverlay";
+  overlay.className = "auth-overlay";
+  overlay.innerHTML = `
+    <div class="auth-modal" role="dialog" aria-modal="true">
+      <h3>${t("auth_profile_title")}</h3>
+      <p class="auth-sub">${t("auth_profile_sub")}</p>
+      <label class="auth-label">${t("auth_phone")}</label>
+      <input class="search-input auth-input" id="profilePhone" type="tel" placeholder="${t("auth_phone_ph")}" style="width:100%;color:var(--ink);">
+      <label class="auth-label">${t("auth_prepare")}</label>
+      <select class="search-input auth-input" id="profilePrepare" style="width:100%;color:var(--ink);">
+        <option value="">—</option>
+        <option value="bac">Concours post-bac (ENSA, Médecine, ENCG…)</option>
+        <option value="bac2">Concours Bac+2</option>
+        <option value="licence">Licence</option>
+        <option value="master">Master / Bac+5</option>
+        <option value="enseignement">Concours d'enseignement</option>
+        <option value="autre">Autre / plusieurs</option>
+      </select>
+      <div id="profileError" class="auth-error" hidden></div>
+      <button class="btn primary" type="button" id="profileSaveBtn" style="width:100%;justify-content:center;margin-top:14px;">${t("auth_profile_save")}</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById("profileSaveBtn").addEventListener("click", async () => {
+    const phone = document.getElementById("profilePhone").value;
+    const prepare = document.getElementById("profilePrepare").value;
+    const err = document.getElementById("profileError");
+    if (!isValidPhone(phone)){
+      err.textContent = t("auth_phone_required");
+      err.hidden = false;
+      return;
+    }
+    if (!prepare){
+      err.textContent = t("auth_prepare_required");
+      err.hidden = false;
+      return;
+    }
+    try{
+      await saveUserProfileMeta({ phone, prepare_level: prepare });
+      overlay.remove();
+    }catch(e){
+      err.textContent = authErrorMessage(e);
+      err.hidden = false;
+    }
+  });
 }
 function showAuthError(msg){
   const el = document.getElementById("authError");
@@ -1380,16 +1494,33 @@ function initAuthModalEvents(){
     const password = document.getElementById("authPassword").value;
     const usernameEl = document.getElementById("authUsername");
     const username = usernameEl ? usernameEl.value.trim().replace(/\s+/g, "_").slice(0, 32) : "";
+    const phone = (document.getElementById("authPhone") || {}).value || "";
+    const prepare = (document.getElementById("authPrepare") || {}).value || "";
     try{
       if (authMode === "signup"){
         if (!username || username.length < 2){
           showAuthError(currentLang === "ar" ? "اختر اسم مستخدم (حرفان على الأقل)" : "Choisis un nom d'utilisateur (2 caractères min.)");
           return;
         }
+        if (!isValidPhone(phone)){
+          showAuthError(t("auth_phone_required"));
+          return;
+        }
+        if (!prepare){
+          showAuthError(t("auth_prepare_required"));
+          return;
+        }
         const { data, error } = await sbClient.auth.signUp({
           email,
           password,
-          options: { data: { username } }
+          options: {
+            data: {
+              username,
+              phone: normalizePhone(phone),
+              prepare_level: prepare,
+              prepare_label: PREPARE_LABELS[prepare] || prepare
+            }
+          }
         });
         if (error) throw error;
         if (data.user && !data.session){
