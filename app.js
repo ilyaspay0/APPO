@@ -867,6 +867,24 @@ async function loadExamsMeta(){
   loadUploadedContent().catch(() => {});
 }
 
+async function fetchExamApi(path, id, attempts){
+  attempts = attempts || 2;
+  let lastErr = null;
+  for (let i = 0; i < attempts; i++){
+    try{
+      // Cold start Vercel + gros JSON : jusqu'à 30s, 2 essais
+      const res = await fetchWithTimeout(path + encodeURIComponent(id), 30000);
+      if (!res || !res.ok) throw new Error("HTTP " + (res && res.status));
+      return await res.json();
+    }catch(e){
+      lastErr = e;
+      // petite pause avant retry (laisse le serverless se réveiller)
+      await new Promise(r => setTimeout(r, 600 * (i + 1)));
+    }
+  }
+  throw lastErr || new Error("exam api failed");
+}
+
 async function loadExamQuestions(id){
   if (examQuestionsCache.has(id)) return examQuestionsCache.get(id);
   if (UPLOADED_BY_ID.has(id)){
@@ -877,9 +895,7 @@ async function loadExamQuestions(id){
     examQuestionsCache.set(id, questions);
     return questions;
   }
-  const res = await fetch("/api/exam?id=" + encodeURIComponent(id));
-  if (!res.ok) throw new Error("exam fetch failed");
-  const data = await res.json();
+  const data = await fetchExamApi("/api/exam?id=", id, 2);
   examQuestionsCache.set(id, data.questions);
   return data.questions;
 }
@@ -892,9 +908,7 @@ async function loadCorrections(id){
     examCorrectionsCache.set(id, corrections);
     return corrections;
   }
-  const res = await fetch("/api/correction?id=" + encodeURIComponent(id));
-  if (!res.ok) throw new Error("correction fetch failed");
-  const data = await res.json();
+  const data = await fetchExamApi("/api/correction?id=", id, 2);
   examCorrectionsCache.set(id, data.corrections);
   return data.corrections;
 }
