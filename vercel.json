@@ -1,4 +1,21 @@
 {
+  "rewrites": [
+    { "source": "/api/exams", "destination": "/api?op=exams" },
+    { "source": "/api/exam", "destination": "/api?op=exam" },
+    { "source": "/api/correction", "destination": "/api?op=correction" },
+    { "source": "/api/bac2-exams", "destination": "/api?op=exams&niveau=bac2" },
+    { "source": "/api/bac3-exams", "destination": "/api?op=exams&niveau=bac3" },
+    { "source": "/api/master-exams", "destination": "/api?op=exams&niveau=master" },
+    { "source": "/api/licence-exams", "destination": "/api?op=exams&niveau=licence" },
+    { "source": "/api/bac2-exam", "destination": "/api?op=exam" },
+    { "source": "/api/bac3-exam", "destination": "/api?op=exam" },
+    { "source": "/api/master-exam", "destination": "/api?op=exam" },
+    { "source": "/api/licence-exam", "destination": "/api?op=exam" },
+    { "source": "/api/bac2-correction", "destination": "/api?op=correction" },
+    { "source": "/api/bac3-correction", "destination": "/api?op=correction" },
+    { "source": "/api/master-correction", "destination": "/api?op=correction" },
+    { "source": "/api/licence-correction", "destination": "/api?op=correction" }
+  ],
   "headers": [
     {
       "source": "/data/(.*)",
@@ -10,38 +27,11 @@
       ]
     },
     {
-      "source": "/api/exams",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=600, s-maxage=86400, stale-while-revalidate=604800"
-        }
-      ]
-    },
-    {
-      "source": "/api/(exam|correction)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
-        }
-      ]
-    },
-    {
       "source": "/(app.js|sw.js|manifest.json)",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "public, max-age=3600, s-maxage=86400"
-        }
-      ]
-    },
-    {
-      "source": "/images/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=604800, immutable"
         }
       ]
     }

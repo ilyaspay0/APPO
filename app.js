@@ -862,7 +862,7 @@ async function fetchMetaJson(staticUrl, apiUrl){
 }
 
 async function loadExamsMeta(){
-  EXAMS_DB = await fetchMetaJson("/data/exams-meta.json", "/api/exams?niveau=bac");
+  EXAMS_DB = await fetchMetaJson("/data/exams-meta.json", "/api?op=exams&niveau=bac");
   EXAMS_META_LOADED = true;
   loadUploadedContent().catch(() => {});
 }
@@ -895,7 +895,7 @@ async function loadExamQuestions(id){
     examQuestionsCache.set(id, questions);
     return questions;
   }
-  const data = await fetchExamApi("/api/exam?id=", id, 2);
+  const data = await fetchExamApi("/api?op=exam&id=", id, 2);
   examQuestionsCache.set(id, data.questions);
   return data.questions;
 }
@@ -908,7 +908,7 @@ async function loadCorrections(id){
     examCorrectionsCache.set(id, corrections);
     return corrections;
   }
-  const data = await fetchExamApi("/api/correction?id=", id, 2);
+  const data = await fetchExamApi("/api?op=correction&id=", id, 2);
   examCorrectionsCache.set(id, data.corrections);
   return data.corrections;
 }
@@ -920,7 +920,7 @@ const bac2QuestionsCache = new Map();
 const bac2AnswersCache = new Map();
 
 async function loadBac2Meta(){
-  BAC2_DB = await fetchMetaJson("/data/bac2-meta.json", "/api/exams?niveau=bac2");
+  BAC2_DB = await fetchMetaJson("/data/bac2-meta.json", "/api?op=exams&niveau=bac2");
   BAC2_META_LOADED = true;
   loadUploadedContent().catch(() => {});
 }
@@ -932,7 +932,7 @@ async function loadBac2Questions(id){
     bac2QuestionsCache.set(id, data);
     return data;
   }
-  const data = await fetchExamApi("/api/exam?id=", id, 2);
+  const data = await fetchExamApi("/api?op=exam&id=", id, 2);
   bac2QuestionsCache.set(id, data);
   return data;
 }
@@ -944,7 +944,7 @@ async function loadBac2Answers(id){
     bac2AnswersCache.set(id, answers);
     return answers;
   }
-  const data = await fetchExamApi("/api/correction?id=", id, 2);
+  const data = await fetchExamApi("/api?op=correction&id=", id, 2);
   bac2AnswersCache.set(id, data.answers || data.corrections);
   return data.answers || data.corrections;
 }
@@ -963,7 +963,7 @@ const bac3QuestionsCache = new Map();
 const bac3AnswersCache = new Map();
 
 async function loadBac3Meta(){
-  BAC3_DB = await fetchMetaJson("/data/bac3-meta.json", "/api/exams?niveau=bac3");
+  BAC3_DB = await fetchMetaJson("/data/bac3-meta.json", "/api?op=exams&niveau=bac3");
   BAC3_META_LOADED = true;
   loadUploadedContent().catch(() => {});
 }
@@ -975,13 +975,13 @@ async function loadBac3Questions(id){
     bac3QuestionsCache.set(id, data);
     return data;
   }
-  const data = await fetchExamApi("/api/exam?id=", id, 2);
+  const data = await fetchExamApi("/api?op=exam&id=", id, 2);
   bac3QuestionsCache.set(id, data);
   return data;
 }
 async function loadBac3Answers(id){
   if (bac3AnswersCache.has(id)) return bac3AnswersCache.get(id);
-  const data = await fetchExamApi("/api/correction?id=", id, 2);
+  const data = await fetchExamApi("/api?op=correction&id=", id, 2);
   bac3AnswersCache.set(id, data.answers || data.corrections);
   return data.answers || data.corrections;
 }
@@ -1013,7 +1013,7 @@ const masterQuestionsCache = new Map();
 const masterAnswersCache = new Map();
 
 async function loadMasterMeta(){
-  MASTER_DB = await fetchMetaJson("/data/master-meta.json", "/api/exams?niveau=master");
+  MASTER_DB = await fetchMetaJson("/data/master-meta.json", "/api?op=exams&niveau=master");
   MASTER_META_LOADED = true;
   loadUploadedContent().catch(() => {});
 }
@@ -1027,7 +1027,7 @@ const licenceAnswersCache = new Map();
 async function loadLicenceMeta(){
   // Pas de JSON statique obligatoire : les imports admin suffisent
   try{
-    LICENCE_DB = await fetchMetaJson("/data/licence-meta.json", "/api/exams?niveau=licence");
+    LICENCE_DB = await fetchMetaJson("/data/licence-meta.json", "/api?op=exams&niveau=licence");
   }catch(e){
     LICENCE_DB = LICENCE_DB || [];
   }
@@ -1045,7 +1045,7 @@ async function loadLicenceQuestions(id){
     licenceQuestionsCache.set(id, questions);
     return questions;
   }
-  const data = await fetchExamApi("/api/exam?id=", id, 2);
+  const data = await fetchExamApi("/api?op=exam&id=", id, 2);
   licenceQuestionsCache.set(id, data.questions);
   return data.questions;
 }
@@ -1057,7 +1057,7 @@ async function loadLicenceCorrections(id){
     licenceAnswersCache.set(id, corrections);
     return corrections;
   }
-  const data = await fetchExamApi("/api/correction?id=", id, 2);
+  const data = await fetchExamApi("/api?op=correction&id=", id, 2);
   licenceAnswersCache.set(id, data.corrections);
   return data.corrections;
 }
@@ -1088,7 +1088,7 @@ async function loadMasterQuestions(id){
 }
 async function loadMasterAnswers(id){
   if (masterAnswersCache.has(id)) return masterAnswersCache.get(id);
-  const data = await fetchExamApi("/api/correction?id=", id, 2);
+  const data = await fetchExamApi("/api?op=correction&id=", id, 2);
   masterAnswersCache.set(id, data.answers);
   return data.answers;
 }
