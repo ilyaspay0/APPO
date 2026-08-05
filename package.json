@@ -1,0 +1,14 @@
+{
+  "name": "suprepa",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Suprepa — concours marocains QCM",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1"
+  },
+  "scripts": {
+    "migrate": "node scripts/migrate-to-supabase.js",
+    "migrate:dry": "node scripts/migrate-to-supabase.js --dry-run",
+    "build-meta": "node scripts/build-meta.js"
+  }
+}

@@ -1,30 +1,49 @@
-const EXAMS = require("./_data/exams-full.json");
-const byId = new Map(EXAMS.map(e => [e.id, e]));
+/**
+ * GET /api/exam?id=...
+ * Questions only (no correct / explanation). Source: Supabase content_exams.
+ */
+const { getServiceClient, getId, sendJson } = require("./_lib/supabase");
 
-module.exports = (req, res) => {
-  const id = (req.query && req.query.id) || new URL(req.url, "http://x").searchParams.get("id");
-  const exam = id && byId.get(id);
-  if (!exam) {
-    res.status(404).json({ error: "exam not found" });
-    return;
+module.exports = async (req, res) => {
+  const id = getId(req);
+  if (!id) return sendJson(res, 400, { error: "missing id" });
+
+  try {
+    const sb = getServiceClient();
+    const { data, error } = await sb
+      .from("content_exams")
+      .select("id,concours,matiere,annee,n,n_corrected,type,questions,niveau")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return sendJson(res, 404, { error: "exam not found" });
+
+    const questions = (data.questions || []).map((q) => ({
+      num: q.num,
+      text: q.text,
+      options: q.options || undefined,
+      hasCorrection: !!(q.correct || q.answer),
+    }));
+
+    return sendJson(
+      res,
+      200,
+      {
+        id: data.id,
+        concours: data.concours,
+        matiere: data.matiere,
+        annee: data.annee,
+        n: data.n,
+        nCorrected: data.n_corrected,
+        type: data.type || "qcm",
+        questions,
+      },
+      "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+    );
+  } catch (e) {
+    console.error("api/exam", e);
+    const status = e.code === "NO_SUPABASE_ENV" ? 503 : 500;
+    return sendJson(res, status, { error: e.message || "server error" });
   }
-  // On ne renvoie JAMAIS correct/explanation ici — uniquement l'énoncé, les options,
-  // et un simple booléen indiquant si une correction existe (sans la révéler).
-  const questions = exam.questions.map(q => ({
-    num: q.num,
-    text: q.text,
-    options: q.options,
-    hasCorrection: !!q.correct
-  }));
-  res.setHeader("Cache-Control", "public, max-age=300, s-maxage=3600");
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.status(200).send(JSON.stringify({
-    id: exam.id,
-    concours: exam.concours,
-    matiere: exam.matiere,
-    annee: exam.annee,
-    n: exam.n,
-    nCorrected: exam.nCorrected,
-    questions
-  }));
 };

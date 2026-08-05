@@ -1,19 +1,28 @@
-const EXAMS = require("./_data/bac2-full.json");
-const byId = new Map(EXAMS.map(e => [e.id, e]));
+const { getServiceClient, getId, sendJson } = require("./_lib/supabase");
 
-module.exports = (req, res) => {
-  const id = (req.query && req.query.id) || new URL(req.url, "http://x").searchParams.get("id");
-  const exam = id && byId.get(id);
-  if (!exam) {
-    res.status(404).json({ error: "exam not found" });
-    return;
+module.exports = async (req, res) => {
+  const id = getId(req);
+  if (!id) return sendJson(res, 400, { error: "missing id" });
+  try {
+    const sb = getServiceClient();
+    const { data, error } = await sb
+      .from("content_exams")
+      .select("id,questions")
+      .eq("id", id)
+      .eq("niveau", "bac2")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return sendJson(res, 404, { error: "exam not found" });
+    const answers = (data.questions || []).map((q) => ({
+      answer: q.answer || null,
+      explanation: q.explanation || null,
+      correct: q.correct || null,
+    }));
+    return sendJson(res, 200, { id: data.id, answers }, "private, max-age=60");
+  } catch (e) {
+    console.error("api/bac2-correction", e);
+    return sendJson(res, e.code === "NO_SUPABASE_ENV" ? 503 : 500, {
+      error: e.message || "server error",
+    });
   }
-  const answers = exam.questions.map(q =>
-    exam.type === "qcm"
-      ? { correct: q.correct, explanation: q.explanation }
-      : { answer: q.answer }
-  );
-  res.setHeader("Cache-Control", "private, max-age=60");
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.status(200).send(JSON.stringify({ id: exam.id, answers }));
 };
