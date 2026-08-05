@@ -1,8 +1,8 @@
 /**
  * GET /api/exam?id=...
- * Questions only (no correct / explanation). Source: Supabase content_exams.
+ * Any niveau. No correct/explanation in payload.
  */
-const { getServiceClient, getId, sendJson } = require("./_lib/supabase");
+const { getServiceClient, getId, sendJson } = require("../lib/supabase-server");
 
 module.exports = async (req, res) => {
   const id = getId(req);
@@ -12,7 +12,9 @@ module.exports = async (req, res) => {
     const sb = getServiceClient();
     const { data, error } = await sb
       .from("content_exams")
-      .select("id,concours,matiere,annee,n,n_corrected,type,questions,niveau")
+      .select(
+        "id,niveau,concours,matiere,annee,n,n_corrected,type,cycle,filiere,questions"
+      )
       .eq("id", id)
       .maybeSingle();
 
@@ -31,19 +33,23 @@ module.exports = async (req, res) => {
       200,
       {
         id: data.id,
+        niveau: data.niveau,
         concours: data.concours,
         matiere: data.matiere,
         annee: data.annee,
         n: data.n,
         nCorrected: data.n_corrected,
         type: data.type || "qcm",
+        cycle: data.cycle || undefined,
+        filiere: data.filiere || undefined,
         questions,
       },
       "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
     );
   } catch (e) {
     console.error("api/exam", e);
-    const status = e.code === "NO_SUPABASE_ENV" ? 503 : 500;
-    return sendJson(res, status, { error: e.message || "server error" });
+    return sendJson(res, e.code === "NO_SUPABASE_ENV" ? 503 : 500, {
+      error: e.message || "server error",
+    });
   }
 };

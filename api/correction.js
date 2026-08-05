@@ -1,4 +1,8 @@
-const { getServiceClient, getId, sendJson } = require("./_lib/supabase");
+/**
+ * GET /api/correction?id=...
+ * Returns corrections + answers (bac2 libre uses answers).
+ */
+const { getServiceClient, getId, sendJson } = require("../lib/supabase-server");
 
 module.exports = async (req, res) => {
   const id = getId(req);
@@ -8,7 +12,7 @@ module.exports = async (req, res) => {
     const sb = getServiceClient();
     const { data, error } = await sb
       .from("content_exams")
-      .select("id,questions")
+      .select("id,niveau,questions")
       .eq("id", id)
       .maybeSingle();
 
@@ -24,12 +28,17 @@ module.exports = async (req, res) => {
     return sendJson(
       res,
       200,
-      { id: data.id, corrections },
+      {
+        id: data.id,
+        corrections,
+        answers: corrections, // bac2 / master libre clients
+      },
       "private, max-age=60"
     );
   } catch (e) {
     console.error("api/correction", e);
-    const status = e.code === "NO_SUPABASE_ENV" ? 503 : 500;
-    return sendJson(res, status, { error: e.message || "server error" });
+    return sendJson(res, e.code === "NO_SUPABASE_ENV" ? 503 : 500, {
+      error: e.message || "server error",
+    });
   }
 };
