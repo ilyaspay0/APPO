@@ -578,9 +578,7 @@ function renderMath(){
   }
 }
 
-/** Normalize Excel-ish math so KaTeX can render it.
- *  Handles common Excel exports: u_n, e^{{-2}}, √, ∫, S_{2n}, (-1)^{n+1}
- */
+/** Normalize Excel-ish / half-LaTeX so KaTeX can render it. */
 function prepareMathText(raw){
   let s = String(raw == null ? "" : raw);
   if (!s) return s;
@@ -592,19 +590,45 @@ function prepareMathText(raw){
     return [...str].map(ch => map[ch] || ch).join("");
   }
 
-  s = s.replace(/\u2212/g, "-"); // unicode minus
+  /** Find matching closing } for an opening { at openIdx (openIdx points to '{'). */
+  function matchingBrace(str, openIdx){
+    if (str[openIdx] !== "{") return -1;
+    let depth = 0;
+    for (let i = openIdx; i < str.length; i++){
+      if (str[i] === "{") depth++;
+      else if (str[i] === "}"){
+        depth--;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
 
-  // Collapse double braces from Excel: e^{{-2}} → e^{-2}, x^{{n+1}} → x^{n+1}
+  // Protect already well-formed $...$ and $$...$$ so we don't touch them
+  const protectedSlots = [];
+  s = s.replace(/\$\$([\s\S]+?)\$\$/g, function(_, body){
+    protectedSlots.push("$$" + body + "$$");
+    return "%%P" + (protectedSlots.length - 1) + "%%";
+  });
+  s = s.replace(/\$([^$\n]+?)\$/g, function(_, body){
+    // skip obviously broken slots that contain unmatched junk
+    protectedSlots.push("$" + body + "$");
+    return "%%P" + (protectedSlots.length - 1) + "%%";
+  });
+
+  // Fix leftover broken dollars from older bad wraps: t_{0}$) → t_{0})
+  s = s.replace(/\$\s*\)/g, ")");
+  s = s.replace(/\(\s*\$/g, "(");
+  s = s.replace(/\$\s*,/g, ",");
+  s = s.replace(/,\s*\$/g, ",");
+
+  s = s.replace(/\u2212/g, "-");
+
+  // Collapse double braces from Excel: e^{{-2}} → e^{-2}
   s = s.replace(/\^\{\{([^{}]+)\}\}/g, "^{$1}");
   s = s.replace(/_\{\{([^{}]+)\}\}/g, "_{$1}");
 
-  // ∫ with unicode limits
-  s = s.replace(/∫\s*([0-9₀₁₂₃₄₅₆₇₈₉]+)\s*([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, function(_, a, b){
-    const low = mapChars(a, Object.assign({"0":"0","1":"1","2":"2","3":"3","4":"4","5":"5","6":"6","7":"7","8":"8","9":"9"}, subMap));
-    return "\\int_{" + low + "}^{" + mapChars(b, supMap) + "}";
-  });
-
-  // symbols
+  // Greek / symbols (word boundaries for multi-letter)
   s = s.replace(/∫/g, "\\int");
   s = s.replace(/∑/g, "\\sum");
   s = s.replace(/∏/g, "\\prod");
@@ -627,8 +651,11 @@ function prepareMathText(raw){
   s = s.replace(/μ/g, "\\mu");
   s = s.replace(/σ/g, "\\sigma");
   s = s.replace(/ω/g, "\\omega");
+  s = s.replace(/τ/g, "\\tau");
+  // plain "tau" used as time-constant in physics options
+  s = s.replace(/(^|[^\\A-Za-z])tau(?![A-Za-z])/g, "$1\\tau");
 
-  // √ — innermost parentheses first
+  // √
   for (let k = 0; k < 6; k++){
     const next = s.replace(/√\s*\(([^()]*)\)/g, "\\sqrt{$1}");
     if (next === s) break;
@@ -638,7 +665,7 @@ function prepareMathText(raw){
   s = s.replace(/√\s*([A-Za-z0-9]+)/g, "\\sqrt{$1}");
   s = s.replace(/√/g, "\\sqrt");
 
-  // unicode sub/sup attached to letters
+  // unicode sub/sup
   s = s.replace(/([A-Za-z])([₀₁₂₃₄₅₆₇₈₉]+)/g, function(_, b, sub){
     return b + "_{" + mapChars(sub, subMap) + "}";
   });
@@ -646,52 +673,133 @@ function prepareMathText(raw){
     return b + "^{" + mapChars(sup, supMap) + "}";
   });
 
-  // Plain underscore subscripts from Excel: u_n, S_2n, I_0 → u_{n}, S_{2n}, I_{0}
-  // Avoid matching URLs or already braced
-  s = s.replace(/([A-Za-z])_(\{)/g, "$1_$2"); // already braced, leave
+  // Plain underscore: u_C, t_0, U_1 → u_{C}, t_{0}, U_{1}
   s = s.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, "$1_{$2}");
-
-  // Plain caret without braces: x^2 → x^{2} (single token)
+  // Plain caret single token: x^2
   s = s.replace(/([A-Za-z0-9])\^([A-Za-z0-9]+)/g, "$1^{$2}");
 
-  // \int_0^1 → \int_{0}^{1}
+  // \int_0^1 → braced
   s = s.replace(/\\int_\{?([0-9]+)\}?\^\{?([0-9]+)\}?/g, "\\int_{$1}^{$2}");
-  s = s.replace(/\\int_([0-9]+)\^([0-9]+)/g, "\\int_{$1}^{$2}");
 
-  if (s.indexOf("$") >= 0 || s.indexOf("\\(") >= 0) return s;
-
-  // Wrap math fragments in $...$
-  const patterns = [
-    /\\int(?:_\{[^}]+\})?(?:\^\{[^}]+\})?/g,
-    /\\sum(?:_\{[^}]+\})?(?:\^\{[^}]+\})?/g,
-    /\\frac\{[^}]*\}\{[^}]*\}/g,
-    /\\sqrt\{[^}]*\}/g,
-    /\\sqrt(?:\{[^}]*\})?/g,
-    /\\infty/g,
-    /[A-Za-z0-9]*e\^\{[^}]+\}/g,
-    /\(-1\)\^\{[^}]+\}/g,
-    /[A-Za-z][A-Za-z0-9]*\^\{[^}]+\}/g,
-    /[A-Za-z][A-Za-z0-9]*_\{[^}]+\}/g
-  ];
+  // --- Wrap math expressions with balanced braces ---
+  // Build list of [start,end) ranges that must be inside $...$
   const ranges = [];
-  patterns.forEach(function(re){
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(s)) !== null){
-      ranges.push([m.index, m.index + m[0].length]);
-      if (!m[0].length) re.lastIndex++;
+
+  function addRange(a, b){
+    if (a < 0 || b <= a) return;
+    ranges.push([a, b]);
+  }
+
+  // Find e^{...} with BALANCED braces (fixes e^{-(t-t_{0})/\tau})
+  for (let i = 0; i < s.length - 1; i++){
+    if ((s[i] === "e" || s[i] === "E") && s[i + 1] === "^" && s[i + 2] === "{"){
+      const close = matchingBrace(s, i + 2);
+      if (close > 0) addRange(i, close + 1);
     }
-  });
+  }
+
+  // base^{...} / base_{...} with balanced braces
+  for (let i = 0; i < s.length - 1; i++){
+    if ((s[i] === "^" || s[i] === "_") && s[i + 1] === "{"){
+      const close = matchingBrace(s, i + 1);
+      if (close < 0) continue;
+      // include preceding identifier (u, u_C already braced parts, etc.)
+      let start = i;
+      while (start > 0){
+        const c = s[start - 1];
+        if (/[A-Za-z0-9\\]/.test(c)) { start--; continue; }
+        // include trailing } of previous _{...}
+        if (c === "}"){
+          // walk back to matching {
+          let d = 0, j = start - 1;
+          for (; j >= 0; j--){
+            if (s[j] === "}") d++;
+            else if (s[j] === "{"){
+              d--;
+              if (d === 0) break;
+            }
+          }
+          if (j >= 0 && j > 0 && (s[j - 1] === "_" || s[j - 1] === "^")){
+            start = j - 1;
+            continue;
+          }
+          if (j >= 0){ start = j; continue; }
+        }
+        break;
+      }
+      addRange(start, close + 1);
+    }
+  }
+
+  // Common latex commands
+  const cmdRe = /\\(frac|sqrt|int|sum|prod|infty|leq|geq|neq|pm|times|cdot|approx|to|pi|theta|alpha|beta|gamma|delta|lambda|mu|sigma|omega|tau)(?![A-Za-z])/g;
+  let cm;
+  while ((cm = cmdRe.exec(s)) !== null){
+    let end = cm.index + cm[0].length;
+    // swallow following balanced {...} groups (frac has 2)
+    let groups = cm[1] === "frac" ? 2 : (cm[1] === "sqrt" || cm[1] === "int" || cm[1] === "sum" ? 1 : 0);
+    for (let g = 0; g < groups; g++){
+      while (end < s.length && s[end] === " ") end++;
+      if (s[end] === "{"){
+        const c = matchingBrace(s, end);
+        if (c < 0) break;
+        end = c + 1;
+      }
+    }
+    // int/sum optional _{} ^{}
+    if (cm[1] === "int" || cm[1] === "sum"){
+      for (let k = 0; k < 2; k++){
+        while (end < s.length && s[end] === " ") end++;
+        if (s[end] === "_" || s[end] === "^"){
+          if (s[end + 1] === "{"){
+            const c = matchingBrace(s, end + 1);
+            if (c < 0) break;
+            end = c + 1;
+          }
+        }
+      }
+    }
+    addRange(cm.index, end);
+  }
+
+  // Merge overlapping ranges, then expand to contiguous math chunks
   ranges.sort(function(a,b){ return a[0] - b[0] || b[1] - a[1]; });
-  const picked = [];
+  const merged = [];
   ranges.forEach(function(r){
-    if (picked.some(function(p){ return !(r[1] <= p[0] || r[0] >= p[1]); })) return;
-    picked.push(r);
+    if (!merged.length || r[0] > merged[merged.length - 1][1]) merged.push(r.slice());
+    else merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], r[1]);
   });
-  picked.sort(function(a,b){ return b[0] - a[0]; });
-  picked.forEach(function(r){
+
+  // Expand each range over neighboring math characters (=, +, -, /, (), digits glued)
+  function isMathish(ch){
+    return /[A-Za-z0-9\\_\^{\}()+\-*\/=<>|]/.test(ch);
+  }
+  const expanded = merged.map(function(r){
+    let a = r[0], b = r[1];
+    while (a > 0 && isMathish(s[a - 1])) a--;
+    while (b < s.length && isMathish(s[b])) b++;
+    return [a, b];
+  });
+  // merge again after expand
+  expanded.sort(function(a,b){ return a[0] - b[0]; });
+  const finalRanges = [];
+  expanded.forEach(function(r){
+    if (!finalRanges.length || r[0] > finalRanges[finalRanges.length - 1][1]) finalRanges.push(r.slice());
+    else finalRanges[finalRanges.length - 1][1] = Math.max(finalRanges[finalRanges.length - 1][1], r[1]);
+  });
+
+  // Apply $ wrappers from the end
+  finalRanges.sort(function(a,b){ return b[0] - a[0]; });
+  finalRanges.forEach(function(r){
     const frag = s.slice(r[0], r[1]);
+    // don't double-wrap
+    if (frag.indexOf("%%P") >= 0) return;
     s = s.slice(0, r[0]) + "$" + frag + "$" + s.slice(r[1]);
+  });
+
+  // Restore protected
+  s = s.replace(/%%P(\d+)%%/g, function(_, i){
+    return protectedSlots[Number(i)] || "";
   });
 
   return s;
