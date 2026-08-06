@@ -731,13 +731,16 @@ function prepareMathText(raw){
     }
   }
 
-  // Common latex commands
-  const cmdRe = /\\(frac|sqrt|int|sum|prod|infty|leq|geq|neq|pm|times|cdot|approx|to|pi|theta|alpha|beta|gamma|delta|lambda|mu|sigma|omega|tau)(?![A-Za-z])/g;
+  // Any \command (times, lambda, text, mathrm, …) + following braces / _^{}
+  const cmdRe = /\\([A-Za-z]+)/g;
   let cm;
   while ((cm = cmdRe.exec(s)) !== null){
+    // skip if this is inside a %%P protected marker (markers have no backslash cmds)
     let end = cm.index + cm[0].length;
-    // swallow following balanced {...} groups (frac has 2)
-    let groups = cm[1] === "frac" ? 2 : (cm[1] === "sqrt" || cm[1] === "int" || cm[1] === "sum" ? 1 : 0);
+    const name = cm[1];
+    let groups = 0;
+    if (name === "frac") groups = 2;
+    else if (name === "sqrt" || name === "text" || name === "mathrm" || name === "mathbf" || name === "textit") groups = 1;
     for (let g = 0; g < groups; g++){
       while (end < s.length && s[end] === " ") end++;
       if (s[end] === "{"){
@@ -746,20 +749,23 @@ function prepareMathText(raw){
         end = c + 1;
       }
     }
-    // int/sum optional _{} ^{}
-    if (cm[1] === "int" || cm[1] === "sum"){
-      for (let k = 0; k < 2; k++){
-        while (end < s.length && s[end] === " ") end++;
-        if (s[end] === "_" || s[end] === "^"){
-          if (s[end + 1] === "{"){
-            const c = matchingBrace(s, end + 1);
-            if (c < 0) break;
-            end = c + 1;
-          }
-        }
-      }
+    // optional _{} ^{} after command (e.g. \lambda_{0}, \int_{0}^{1})
+    for (let k = 0; k < 3; k++){
+      while (end < s.length && s[end] === " ") end++;
+      if ((s[end] === "_" || s[end] === "^") && s[end + 1] === "{"){
+        const c = matchingBrace(s, end + 1);
+        if (c < 0) break;
+        end = c + 1;
+      } else break;
     }
     addRange(cm.index, end);
+  }
+
+  // Scientific notation glued: 3\times10^{8}, 3.10^{-2}, 10^{-1}
+  const sciRe = /\d+(?:\.\d+)?(?:\s*\\times\s*|\s*[·.]\s*)?10\^\{-?\d+\}/g;
+  let sm;
+  while ((sm = sciRe.exec(s)) !== null){
+    addRange(sm.index, sm.index + sm[0].length);
   }
 
   // Merge overlapping ranges, then expand to contiguous math chunks
