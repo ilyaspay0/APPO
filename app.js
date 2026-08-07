@@ -22,33 +22,41 @@ function formatRichText(str){
     return "%%MATH" + (slots.length - 1) + "%%";
   });
   let s = escapeHtml(prepared);
+
+  // Collect image URLs once (markdown + bare + /images/), use placeholders
+  // so the same URL is never turned into <img> twice.
+  const imgs = [];
+  function pushImg(url){
+    url = String(url || "").trim().replace(/&amp;/g, "&");
+    // strip accidental trailing quote/paren from regex greed
+    url = url.replace(/["')]+$/g, "");
+    if (!url) return "%%IMG" + (imgs.length ? imgs.length - 1 : 0) + "%%";
+    const key = url.toLowerCase();
+    const existing = imgs.findIndex(u => u.toLowerCase() === key);
+    if (existing >= 0) return "%%IMG" + existing + "%%";
+    imgs.push(url);
+    return "%%IMG" + (imgs.length - 1) + "%%";
+  }
+
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/gi, function(_, alt, url){
+    return pushImg(url);
+  });
+  s = s.replace(/(https?:\/\/[^\s<"']+\.(?:png|jpe?g|gif|webp|svg)(?:\?[^\s<"']*)?)/gi, function(url){
+    return pushImg(url);
+  });
+  s = s.replace(/(^|[\s>])(\/images\/[^\s<"']+\.(?:png|jpe?g|gif|webp|svg))/gi, function(_, pre, path){
+    return pre + pushImg(path);
+  });
+
   s = s.replace(/%%MATH(\d+)%%/g, function(_, i){
     const it = slots[Number(i)];
     const body = escapeHtml(it.m);
     return it.d ? ("$$" + body + "$$") : ("$" + body + "$");
   });
-  // Markdown images ![alt](url) — relative or absolute
-  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/gi, function(_, alt, url){
-    url = url.trim();
-    if (!/^https?:\/\//i.test(url) && url.charAt(0) === "/") {
-      /* site-relative ok */
-    } else if (!/^https?:\/\//i.test(url)) {
-      return ""; // skip junk
-    }
+  s = s.replace(/%%IMG(\d+)%%/g, function(_, i){
+    const url = imgs[Number(i)];
+    if (!url) return "";
     return '<img class="q-img" src="' + url + '" alt="" loading="lazy" />';
-  });
-  // Bare image URLs (dedupe)
-  const seenImg = {};
-  s = s.replace(/(https?:\/\/[^\s<]+\.(?:png|jpe?g|gif|webp|svg)(?:\?[^\s<]*)?)/gi, function(url){
-    if (seenImg[url]) return "";
-    seenImg[url] = true;
-    return '<img class="q-img" src="' + url + '" alt="" loading="lazy" />';
-  });
-  // Relative /images/... paths not already turned into <img>
-  s = s.replace(/(^|[\s>])(\/images\/[^\s<]+\.(?:png|jpe?g|gif|webp|svg))/gi, function(_, pre, path){
-    if (seenImg[path]) return pre;
-    seenImg[path] = true;
-    return pre + '<img class="q-img" src="' + path + '" alt="" loading="lazy" />';
   });
   s = s.replace(/\n/g, "<br>");
   return s;
