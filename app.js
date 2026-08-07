@@ -27,11 +27,28 @@ function formatRichText(str){
     const body = escapeHtml(it.m);
     return it.d ? ("$$" + body + "$$") : ("$" + body + "$");
   });
-  s = s.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi, function(_, alt, url){
-    return '<img class="q-img" src="' + url + '" alt="' + (alt || "figure") + '" loading="lazy" />';
+  // Markdown images ![alt](url) — relative or absolute
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/gi, function(_, alt, url){
+    url = url.trim();
+    if (!/^https?:\/\//i.test(url) && url.charAt(0) === "/") {
+      /* site-relative ok */
+    } else if (!/^https?:\/\//i.test(url)) {
+      return ""; // skip junk
+    }
+    return '<img class="q-img" src="' + url + '" alt="" loading="lazy" />';
   });
+  // Bare image URLs (dedupe)
+  const seenImg = {};
   s = s.replace(/(https?:\/\/[^\s<]+\.(?:png|jpe?g|gif|webp|svg)(?:\?[^\s<]*)?)/gi, function(url){
-    return '<img class="q-img" src="' + url + '" alt="figure" loading="lazy" />';
+    if (seenImg[url]) return "";
+    seenImg[url] = true;
+    return '<img class="q-img" src="' + url + '" alt="" loading="lazy" />';
+  });
+  // Relative /images/... paths not already turned into <img>
+  s = s.replace(/(^|[\s>])(\/images\/[^\s<]+\.(?:png|jpe?g|gif|webp|svg))/gi, function(_, pre, path){
+    if (seenImg[path]) return pre;
+    seenImg[path] = true;
+    return pre + '<img class="q-img" src="' + path + '" alt="" loading="lazy" />';
   });
   s = s.replace(/\n/g, "<br>");
   return s;
@@ -561,7 +578,23 @@ function enableSwipeNav(el, { onNext, onPrev }){
   }, { passive:true });
 }
 
+function hideBrokenImages(root){
+  const el = root || app;
+  if (!el) return;
+  el.querySelectorAll("img.q-img").forEach(function(img){
+    const kill = function(){
+      img.setAttribute("data-broken", "1");
+      img.classList.add("is-broken");
+      img.removeAttribute("src");
+      img.style.display = "none";
+    };
+    img.addEventListener("error", kill);
+    // already failed (cached error)
+    if (img.complete && img.naturalWidth === 0) kill();
+  });
+}
 function renderMath(){
+  hideBrokenImages(app);
   if (window.renderMathInElement){
     renderMathInElement(app, {
       delimiters: [
