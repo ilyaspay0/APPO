@@ -95,6 +95,9 @@ const I18N = {
     donate_copy:"Copier le RIB",
     donate_copied:"RIB copié ✓",
     donate_note:"Libellé suggéré : Don Suprepa. Merci !",
+    ad_break_title:"Bravo !",
+    ad_break_sub:"Petite pause…",
+    ad_break_continue:"Continuer vers la question {n}",
     auth_sub:"Synchronise ta progression entre ton téléphone et ton ordinateur.", auth_google:"Continuer avec Google",
     auth_or:"ou", auth_email:"Email", auth_password:"Mot de passe", auth_username:"Nom d'utilisateur", auth_username_ph:"ex. sara_ensa", auth_login:"Se connecter", auth_signup:"Créer mon compte",
     auth_phone:"Téléphone", auth_phone_ph:"06 XX XX XX XX",
@@ -226,6 +229,9 @@ const I18N = {
     donate_copy:"نسخ RIB",
     donate_copied:"تم نسخ RIB ✓",
     donate_note:"المرجع المقترح: Don Suprepa. شكرًا!",
+    ad_break_title:"أحسنت!",
+    ad_break_sub:"استراحة قصيرة…",
+    ad_break_continue:"المتابعة إلى السؤال {n}",
     auth_sub:"زامن تقدمك بين هاتفك وحاسوبك.", auth_google:"الاستمرار باستخدام Google",
     auth_or:"أو", auth_email:"البريد الإلكتروني", auth_password:"كلمة المرور", auth_username:"اسم المستخدم", auth_username_ph:"مثال sara_ensa", auth_login:"تسجيل الدخول", auth_signup:"إنشاء حسابي",
     auth_phone:"الهاتف", auth_phone_ph:"06 XX XX XX XX",
@@ -362,11 +368,10 @@ function showAdBreak(nextQuestionNumber, onContinue){
     overlay.hidden = true;
     document.body.appendChild(overlay);
   }
-  const contLabel = currentLang === "ar"
-    ? (`المتابعة إلى السؤال ${nextQuestionNumber}`)
-    : (`Continue to Question ${nextQuestionNumber}`);
-  const title = currentLang === "ar" ? "أحسنت!" : "Great job!";
-  const sub = currentLang === "ar" ? "استراحة قصيرة…" : "Taking a quick break…";
+  const title = t("ad_break_title");
+  const sub = t("ad_break_sub");
+  const contLabel = t("ad_break_continue").replace("{n}", String(nextQuestionNumber));
+  const isRtl = currentLang === "ar";
 
   let adInner = "";
   if (ADS_CONFIG.adsenseClient && ADS_CONFIG.adsenseSlot){
@@ -381,7 +386,7 @@ function showAdBreak(nextQuestionNumber, onContinue){
   }
 
   overlay.innerHTML = `
-    <div class="ad-break-panel" role="dialog" aria-modal="true" aria-labelledby="adBreakTitle">
+    <div class="ad-break-panel" role="dialog" aria-modal="true" aria-labelledby="adBreakTitle" dir="${isRtl ? "rtl" : "ltr"}" lang="${isRtl ? "ar" : "fr"}">
       <h2 id="adBreakTitle" class="ad-break-title">${title}</h2>
       <p class="ad-break-sub">${sub}</p>
       <div class="ad-break-card">${adInner}</div>
