@@ -1,4 +1,4 @@
-SUPREPA — fix "No more than 12 Serverless Functions" (Hobby)
+SUPREPA  — fix "No more than 12 Serverless Functions" (Hobby)
 
 CAUSE
 -----
