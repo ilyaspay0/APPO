@@ -325,56 +325,117 @@ const I18N = {
   }
 };
 
-// ---------- Don / soutien (virement BMCE) ----------
-// Remplace titulaire + RIB par tes vraies infos BMCE.
-const DONATE_CONFIG = {
-  bank: "BMCE Bank of Africa",
-  holder: "ILYAS TAMMOUCH",   // ← ton nom sur le compte
-  rib: "011 780 0000XXXXXXXXXX 00", // ← ton RIB complet (24 chiffres)
-  iban: "" // optionnel, laisse vide si tu n'en as pas
+// ---------- Ads interstitial (pause after every N questions) ----------
+// Style inspired by fmprepa "Great job / Taking a quick break"
+const ADS_CONFIG = {
+  enabled: true,
+  everyN: 5, // show break when entering Q6, Q11, Q16… (0-based idx 5, 10, 15…)
+  // Optional Google AdSense — leave empty to show a neutral placeholder card
+  adsenseClient: "", // e.g. "ca-pub-xxxxxxxxxxxxxxxx"
+  adsenseSlot: "",   // e.g. "1234567890"
 };
 
-function openDonateModal(){
-  const overlay = document.getElementById("donateOverlay");
-  if (!overlay) return;
-  const holder = document.getElementById("donateHolder");
-  const rib = document.getElementById("donateRib");
-  const iban = document.getElementById("donateIban");
-  const ibanRow = document.getElementById("donateIbanRow");
-  if (holder) holder.textContent = DONATE_CONFIG.holder;
-  if (rib) rib.textContent = DONATE_CONFIG.rib;
-  if (DONATE_CONFIG.iban && iban && ibanRow){
-    iban.textContent = DONATE_CONFIG.iban;
-    ibanRow.hidden = false;
+/** True when navigating forward onto a multiple of everyN (after 5 seen questions). */
+function shouldShowAdBreak(fromIdx, toIdx){
+  if (!ADS_CONFIG.enabled) return false;
+  if (!(toIdx > fromIdx)) return false;
+  const n = Math.max(1, ADS_CONFIG.everyN | 0);
+  // After viewing questions 1..5 (idx 0..4), break before idx 5 (question 6)
+  return toIdx > 0 && (toIdx % n === 0);
+}
+
+function closeAdBreak(){
+  const el = document.getElementById("adBreakOverlay");
+  if (el) el.hidden = true;
+}
+
+/**
+ * Show interstitial; on Continue, run onContinue().
+ * nextQuestionNumber is 1-based for the label.
+ */
+function showAdBreak(nextQuestionNumber, onContinue){
+  let overlay = document.getElementById("adBreakOverlay");
+  if (!overlay){
+    overlay = document.createElement("div");
+    overlay.id = "adBreakOverlay";
+    overlay.className = "ad-break-overlay";
+    overlay.hidden = true;
+    document.body.appendChild(overlay);
   }
+  const contLabel = currentLang === "ar"
+    ? (`المتابعة إلى السؤال ${nextQuestionNumber}`)
+    : (`Continue to Question ${nextQuestionNumber}`);
+  const title = currentLang === "ar" ? "أحسنت!" : "Great job!";
+  const sub = currentLang === "ar" ? "استراحة قصيرة…" : "Taking a quick break…";
+
+  let adInner = "";
+  if (ADS_CONFIG.adsenseClient && ADS_CONFIG.adsenseSlot){
+    adInner = `<ins class="adsbygoogle ad-break-unit"
+      style="display:block;min-height:250px"
+      data-ad-client="${ADS_CONFIG.adsenseClient}"
+      data-ad-slot="${ADS_CONFIG.adsenseSlot}"
+      data-ad-format="auto"
+      data-full-width-responsive="true"></ins>`;
+  } else {
+    adInner = `<div class="ad-break-placeholder" aria-hidden="true"></div>`;
+  }
+
+  overlay.innerHTML = `
+    <div class="ad-break-panel" role="dialog" aria-modal="true" aria-labelledby="adBreakTitle">
+      <h2 id="adBreakTitle" class="ad-break-title">${title}</h2>
+      <p class="ad-break-sub">${sub}</p>
+      <div class="ad-break-card">${adInner}</div>
+      <button type="button" class="btn primary ad-break-continue" id="adBreakContinue">${contLabel}</button>
+    </div>`;
   overlay.hidden = false;
+  window.scrollTo(0, 0);
+
+  // Push AdSense if configured
+  if (ADS_CONFIG.adsenseClient && ADS_CONFIG.adsenseSlot){
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (e) {}
+  }
+
+  const btn = document.getElementById("adBreakContinue");
+  if (btn){
+    btn.onclick = () => {
+      closeAdBreak();
+      if (typeof onContinue === "function") onContinue();
+    };
+  }
 }
-function closeDonateModal(){
-  const overlay = document.getElementById("donateOverlay");
-  if (overlay) overlay.hidden = true;
+
+/**
+ * Shared next-question handler: optional ad break every N questions.
+ * @param {object} state - must have .idx
+ * @param {number} total
+ * @param {function} renderQuestion
+ * @param {function} [onFinish] - if on last question
+ */
+async function goNextQuestion(state, total, renderQuestion, onFinish){
+  if (state.idx >= total - 1){
+    if (typeof onFinish === "function") await onFinish();
+    return;
+  }
+  const from = state.idx;
+  const to = state.idx + 1;
+  const advance = async () => {
+    state.idx = to;
+    await renderQuestion();
+    window.scrollTo(0, 0);
+  };
+  if (shouldShowAdBreak(from, to)){
+    showAdBreak(to + 1, advance);
+  } else {
+    await advance();
+  }
 }
-function initDonateUI(){
-  document.getElementById("donateOpenBtn")?.addEventListener("click", openDonateModal);
-  document.getElementById("donateTopbarBtn")?.addEventListener("click", openDonateModal);
-  document.getElementById("donateCloseBtn")?.addEventListener("click", closeDonateModal);
-  document.getElementById("donateOverlay")?.addEventListener("click", (e) => {
-    if (e.target.id === "donateOverlay") closeDonateModal();
-  });
-  document.getElementById("donateCopyBtn")?.addEventListener("click", async () => {
-    const text = (DONATE_CONFIG.rib || "").replace(/\s/g, "");
-    try{
-      await navigator.clipboard.writeText(text);
-      const btn = document.getElementById("donateCopyBtn");
-      if (btn){
-        const prev = btn.textContent;
-        btn.textContent = t("donate_copied");
-        setTimeout(() => { btn.textContent = t("donate_copy"); }, 1600);
-      }
-    }catch(e){
-      prompt(currentLang === "ar" ? "انسخ RIB:" : "Copie le RIB :", text);
-    }
-  });
-}
+
+// Donate removed — stubs so old references do not throw
+function openDonateModal(){ /* removed */ }
+function closeDonateModal(){ /* removed */ }
+function initDonateUI(){ /* removed */ }
 
 const LANG_KEY = "suprepa-lang";
 let currentLang = "fr";
@@ -1511,7 +1572,6 @@ function renderAuthArea(){
             ? `<div class="auth-dropdown-email" style="border:0;margin:0;padding-top:0;opacity:.85">${escapeHtml(currentUser.user_metadata.prepare_label)}</div>`
             : ""}
           ${isAdmin() ? `<a class="auth-dropdown-item" href="#/admin">${t("admin_link")}</a>` : ""}
-          <button type="button" class="auth-dropdown-item" id="authDonateBtn">${t("donate_btn")}</button>
           <button type="button" class="auth-dropdown-item auth-dropdown-danger" id="authSignOutBtn">${t("auth_signout")}</button>
         </div>
       </div>`;
@@ -1534,10 +1594,6 @@ function renderAuthArea(){
         dd.hidden ? open() : close();
       });
     }
-    document.getElementById("authDonateBtn")?.addEventListener("click", () => {
-      close();
-      openDonateModal();
-    });
     document.getElementById("authSignOutBtn")?.addEventListener("click", () => {
       close();
       sbClient && sbClient.auth.signOut();
@@ -3802,7 +3858,7 @@ async function renderBac2Session(examId, startIdx){
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     if (prevBtn) prevBtn.addEventListener("click", async () => { if (state.idx>0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }});
-    if (nextBtn) nextBtn.addEventListener("click", async () => { if (state.idx<total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }});
+    if (nextBtn) nextBtn.addEventListener("click", async () => { await goNextQuestion(state, total, renderQuestion); });
   }
 
   await renderQuestion();
@@ -3962,7 +4018,7 @@ async function renderMasterSession(examId, startIdx){
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     if (prevBtn) prevBtn.addEventListener("click", async () => { if (state.idx>0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }});
-    if (nextBtn) nextBtn.addEventListener("click", async () => { if (state.idx<total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }});
+    if (nextBtn) nextBtn.addEventListener("click", async () => { await goNextQuestion(state, total, renderQuestion); });
   }
 
   await renderQuestion();
@@ -4135,7 +4191,7 @@ async function renderBac3Session(examId, startIdx){
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     if (prevBtn) prevBtn.addEventListener("click", async () => { if (state.idx>0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }});
-    if (nextBtn) nextBtn.addEventListener("click", async () => { if (state.idx<total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }});
+    if (nextBtn) nextBtn.addEventListener("click", async () => { await goNextQuestion(state, total, renderQuestion); });
   }
 
   await renderQuestion();
@@ -4374,8 +4430,9 @@ async function renderSession(examId, mode, startIdx){
     });
     $("#prevBtn").addEventListener("click", async () => { if(state.idx>0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }});
     $("#nextBtn").addEventListener("click", async () => {
-      if (state.idx < total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }
-      else { state.finished = true; state.reviewMode = true; persist(true); await renderQuestion(); window.scrollTo(0,0); }
+      await goNextQuestion(state, total, renderQuestion, async () => {
+        state.finished = true; state.reviewMode = true; persist(true); await renderQuestion(); window.scrollTo(0,0);
+      });
     });
 
     const commentsToggle = $("#commentsToggle");
@@ -4461,7 +4518,7 @@ async function renderSession(examId, mode, startIdx){
 
     // Swipe gauche/droite pour naviguer entre les questions (mobile)
     enableSwipeNav($(".question-card"), {
-      onNext: async () => { if (state.idx < total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); } },
+      onNext: async () => { await goNextQuestion(state, total, renderQuestion); },
       onPrev: async () => { if (state.idx > 0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); } }
     });
   }
@@ -4578,7 +4635,7 @@ async function renderSession(examId, mode, startIdx){
         }
       }
     } else if (e.key === "ArrowRight"){
-      if (state.idx < total-1){ state.idx++; await renderQuestion(); window.scrollTo(0,0); }
+      await goNextQuestion(state, total, renderQuestion);
     } else if (e.key === "ArrowLeft"){
       if (state.idx > 0){ state.idx--; await renderQuestion(); window.scrollTo(0,0); }
     } else if (e.key.toLowerCase() === "f"){

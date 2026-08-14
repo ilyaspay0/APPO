@@ -75,6 +75,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"></noscript>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2767989216703111"
+     crossorigin="anonymous"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 
 <!-- Vercel Web Analytics -->
@@ -3552,6 +3554,70 @@ img.q-img[data-broken="1"]{
   overflow-x: auto;
 }
 
+
+/* ---------- Ad break interstitial (every N questions) ---------- */
+.ad-break-overlay{
+  position: fixed; inset: 0; z-index: 9999;
+  background: #F4F6FA;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+.ad-break-overlay[hidden]{ display: none !important; }
+.ad-break-panel{
+  width: min(440px, 100%);
+  text-align: center;
+  padding: 12px 0 28px;
+}
+.ad-break-title{
+  margin: 0 0 8px;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #1a2332;
+  letter-spacing: -0.02em;
+}
+.ad-break-sub{
+  margin: 0 0 28px;
+  font-size: 1.05rem;
+  color: #6b7a90;
+}
+.ad-break-card{
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(15, 42, 74, 0.08);
+  min-height: 220px;
+  margin: 0 auto 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(15, 42, 74, 0.06);
+}
+.ad-break-placeholder{
+  width: 100%;
+  min-height: 220px;
+  background: #fff;
+}
+.ad-break-unit{ width: 100%; min-height: 250px; }
+.ad-break-continue{
+  width: min(360px, 100%);
+  justify-content: center;
+  padding: 14px 24px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+}
+:root[data-theme="dark"] .ad-break-overlay{ background: #0f172a; }
+:root[data-theme="dark"] .ad-break-title{ color: #e2e8f0; }
+:root[data-theme="dark"] .ad-break-sub{ color: #94a3b8; }
+:root[data-theme="dark"] .ad-break-card{
+  background: #1e293b;
+  border-color: rgba(148,163,184,0.15);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+}
+:root[data-theme="dark"] .ad-break-placeholder{ background: #1e293b; }
+
 </style>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 </head>
@@ -3581,10 +3647,6 @@ img.q-img[data-broken="1"]{
           <a href="#/bac3" data-i18n="nav_bac3">Concours d'enseignement</a>
         </div>
       </div>
-      <button type="button" class="donate-topbar-btn" id="donateTopbarBtn" data-i18n-title="donate_btn" title="Soutenir Suprepa" aria-label="Soutenir Suprepa">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-        <span class="donate-topbar-label" data-i18n="donate_btn">Soutenir</span>
-      </button>
       <div id="authArea"></div>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Changer de thème" title="Changer de thème"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <button class="lang-toggle" id="langToggle" type="button" aria-label="Passer l'interface en arabe" title="FR / AR">
@@ -3631,25 +3693,12 @@ img.q-img[data-broken="1"]{
           <span class="icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
           <a href="mailto:ilyaspay0@gmail.com">ilyaspay0@gmail.com</a>
         </div>
-        <button type="button" class="btn gold" id="donateOpenBtn" data-i18n="donate_btn" style="margin-top:14px;">Soutenir Suprepa</button>
       </div>
     </div>
     <div class="footer-bottom" data-i18n="footer_copyright">© 2026 Suprepa — banque de QCM d'entraînement pour les concours marocains</div>
   </div>
 </footer>
 
-<!-- ---------- Modal don BMCE ---------- -->
-<div id="donateOverlay" class="auth-overlay" hidden>
-  <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="donateTitle">
-    <button class="auth-close" id="donateCloseBtn" type="button" aria-label="Fermer">✕</button>
-    <h3 id="donateTitle" data-i18n="donate_title">Soutenir Suprepa</h3>
-    <p class="auth-sub" data-i18n="donate_sub">Le site reste 100 % gratuit. Un virement volontaire aide à l'hébergement et à l'ajout de nouveaux concours.</p>
-    <div class="donate-card">
-      <div class="donate-row"><span data-i18n="donate_bank">Banque</span><strong>BMCE Bank of Africa</strong></div>
-      <div class="donate-row"><span data-i18n="donate_holder">Titulaire</span><strong id="donateHolder">À COMPLÉTER</strong></div>
-      <div class="donate-row"><span data-i18n="donate_rib">RIB</span><strong id="donateRib" class="donate-mono">000 000 0000000000000000 00</strong></div>
-      <div class="donate-row" id="donateIbanRow" hidden><span data-i18n="donate_iban">IBAN</span><strong id="donateIban" class="donate-mono"></strong></div>
-    </div>
     <button type="button" class="btn primary" id="donateCopyBtn" style="width:100%;justify-content:center;margin-top:14px;" data-i18n="donate_copy">Copier le RIB</button>
     <p class="hint" style="margin-top:12px;text-align:center;" data-i18n="donate_note">Libellé suggéré : Don Suprepa. Merci !</p>
   </div>
