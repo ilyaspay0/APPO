@@ -337,8 +337,8 @@ const ADS_CONFIG = {
   enabled: true,
   everyN: 5, // show break when entering Q6, Q11, Q16… (0-based idx 5, 10, 15…)
   // Optional Google AdSense — leave empty to show a neutral placeholder card
-  adsenseClient: "", // e.g. "ca-pub-xxxxxxxxxxxxxxxx"
-  adsenseSlot: "",   // e.g. "1234567890"
+  adsenseClient: "ca-pub-2767989216703111", // e.g. "ca-pub-xxxxxxxxxxxxxxxx"
+  adsenseSlot: "3006727233",   // e.g. "1234567890"
 };
 
 /** True when navigating forward onto a multiple of everyN (after 5 seen questions). */
